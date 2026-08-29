@@ -1,0 +1,9 @@
+{
+  "name": "createFamily",
+  "version": "1.0.0",
+  "description": "创建家庭并生成邀请码",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

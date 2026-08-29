@@ -1,0 +1,39 @@
+<!--pages/me/me.wxml-->
+<view class="page">
+  <view wx:if="{{family}}" class="card">
+    <view class="row">
+      <text class="muted">家庭</text>
+      <text class="val">🏠 {{family.name}}</text>
+    </view>
+
+    <view class="row" bindtap="copyCode">
+      <text class="muted">邀请码</text>
+      <view class="code-val">
+        <text class="code">{{family.inviteCode}}</text>
+        <text class="copy-hint">复制</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{family}}" class="card">
+    <view class="block-title">家庭成员（{{members.length}}/2）</view>
+    <view class="members">
+      <view wx:for="{{members}}" wx:key="openid" class="member">
+        <view class="avatar">{{item.nick ? item.nick[0] : '我'}}</view>
+        <view class="m-name">{{item.nick}}</view>
+        <view wx:if="{{item.me}}" class="me-tag">我</view>
+      </view>
+      <view wx:if="{{members.length < 2}}" class="member empty-slot">
+        <view class="avatar ghost">+</view>
+        <view class="m-name muted">等待另一半加入…</view>
+      </view>
+    </view>
+    <view wx:if="{{members.length < 2}}" class="muted tip">
+      把上面的邀请码发给 TA 吧
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="leave-btn" bindtap="onLeave">退出家庭</button>
+  </view>
+</view>

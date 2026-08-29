@@ -1,0 +1,46 @@
+<!--pages/create/create.wxml-->
+<view class="page">
+  <view wx:if="{{!result}}" class="form card">
+    <view class="title">创建家庭</view>
+
+    <view class="field">
+      <view class="label">家庭名称</view>
+      <input
+        class="input-line"
+        data-field="familyName"
+        value="{{familyName}}"
+        bindinput="onInput"
+        placeholder="比如：我们的家"
+        maxlength="20"
+      />
+    </view>
+
+    <view class="field">
+      <view class="label">你的昵称（对方会看到）</view>
+      <input
+        class="input-line"
+        data-field="myNick"
+        value="{{myNick}}"
+        bindinput="onInput"
+        placeholder="比如：老公 / 老婆"
+        maxlength="10"
+      />
+    </view>
+
+    <button class="btn-primary submit" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '创建中…' : '创建家庭'}}
+    </button>
+  </view>
+
+  <view wx:else class="success card">
+    <view class="success-emoji">🎉</view>
+    <view class="success-title">家庭已创建</view>
+    <view class="muted success-sub">把这个邀请码发给另一半</view>
+    <view class="code-box" bindtap="copyCode">
+      <text class="code">{{result.inviteCode}}</text>
+      <text class="copy-hint">点击复制</text>
+    </view>
+    <view class="muted tip">对方打开小程序 →「我有邀请码，加入」→ 输入这 6 位数即可</view>
+    <button class="btn-primary" bindtap="backHome">进入小本本</button>
+  </view>
+</view>

@@ -1,0 +1,35 @@
+<!--pages/join/join.wxml-->
+<view class="page">
+  <view class="form card">
+    <view class="title">加入家庭</view>
+
+    <view class="field">
+      <view class="label">邀请码（6 位数字）</view>
+      <input
+        class="input-line code-input"
+        data-field="inviteCode"
+        value="{{inviteCode}}"
+        bindinput="onInput"
+        placeholder="000000"
+        type="number"
+        maxlength="6"
+      />
+    </view>
+
+    <view class="field">
+      <view class="label">你的昵称（对方会看到）</view>
+      <input
+        class="input-line"
+        data-field="myNick"
+        value="{{myNick}}"
+        bindinput="onInput"
+        placeholder="比如：老公 / 老婆"
+        maxlength="10"
+      />
+    </view>
+
+    <button class="btn-primary submit" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '加入中…' : '加入家庭'}}
+    </button>
+  </view>
+</view>

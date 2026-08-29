@@ -1,0 +1,76 @@
+<!--pages/index/index.wxml-->
+<view class="page">
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading">加载中…</view>
+
+  <!-- 无家庭：引导 -->
+  <view wx:elif="{{!hasFamily}}" class="guide">
+    <view class="guide-emoji">🏡</view>
+    <view class="guide-title">建立一个你们的小家</view>
+    <view class="guide-sub muted">创建家庭后把邀请码发给另一半，两人就能共享同一个待办清单啦</view>
+    <button class="btn-primary guide-btn" bindtap="goCreate">创建家庭</button>
+    <button class="btn-ghost guide-btn" bindtap="goJoin">我有邀请码，加入</button>
+  </view>
+
+  <!-- 有家庭：列表 -->
+  <view wx:else class="list-wrap">
+    <view class="topbar">
+      <view class="family-name">🏠 {{family.name}}</view>
+      <view class="me-btn" bindtap="goMe">我的 ›</view>
+    </view>
+
+    <view class="stat">
+      <text>待办 {{activeCount}}</text>
+      <text class="muted">· 已完成 {{doneCount}}</text>
+    </view>
+
+    <view wx:if="{{todos.length === 0}}" class="empty">
+      <view class="empty-emoji">📝</view>
+      <view class="muted">还没有待办，加一条吧</view>
+    </view>
+
+    <view wx:else class="todo-list">
+      <view
+        wx:for="{{todos}}"
+        wx:key="_id"
+        class="todo-item {{item.done ? 'done' : ''}}"
+        data-id="{{item._id}}"
+        data-index="{{index}}"
+        bindlongpress="onLongPress"
+      >
+        <view
+          class="checkbox {{item.done ? 'checked' : ''}}"
+          data-id="{{item._id}}"
+          data-index="{{index}}"
+          catchtap="onToggle"
+        >✓</view>
+        <view class="todo-main">
+          <view class="todo-content">{{item.content}}</view>
+          <view class="todo-meta">
+            <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
+            <text class="muted">{{item.timeText}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="sync-tip {{subscribing ? 'on' : ''}}">
+      {{subscribing ? '● 已同步，对方改动会实时出现' : '○ 正在连接…'}}
+    </view>
+  </view>
+
+  <!-- 底部输入栏（仅在有家庭时显示） -->
+  <view wx:if="{{hasFamily}}" class="input-bar">
+    <input
+      class="input-line"
+      placeholder="记一笔家庭待办…"
+      value="{{inputVal}}"
+      bindinput="onInput"
+      confirm-type="done"
+      bindconfirm="onAdd"
+    />
+    <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
+  </view>
+
+</view>

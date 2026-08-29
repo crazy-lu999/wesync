@@ -1,0 +1,48 @@
+/* app.wxss — 全局样式 */
+page {
+  background: #f5f5f7;
+  color: #333;
+  font-size: 30rpx;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", Helvetica, sans-serif;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+view, text { box-sizing: border-box; }
+
+.btn-primary {
+  background: #FF7A59;
+  color: #fff;
+  border-radius: 999rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+.btn-primary[disabled] { background: #ffb39e; color: #fff; }
+
+.btn-ghost {
+  background: #fff;
+  color: #FF7A59;
+  border: 2rpx solid #FF7A59;
+  border-radius: 999rpx;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.04);
+}
+
+.input-line {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  font-size: 30rpx;
+}
+
+.muted { color: #999; font-size: 26rpx; }

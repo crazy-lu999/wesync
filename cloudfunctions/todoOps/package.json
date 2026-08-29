@@ -1,0 +1,9 @@
+{
+  "name": "todoOps",
+  "version": "1.0.0",
+  "description": "待办增删改服务端封装",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

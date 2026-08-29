@@ -1,0 +1,23 @@
+/* pages/create/create.wxss */
+.page { padding-top: 40rpx; }
+.form, .success { padding: 48rpx 32rpx; }
+.title { font-size: 40rpx; font-weight: 600; margin-bottom: 40rpx; text-align: center; }
+.field { margin-bottom: 32rpx; }
+.label { font-size: 26rpx; color: #888; margin-bottom: 12rpx; }
+.submit { margin-top: 24rpx; width: 100%; }
+
+.success { text-align: center; }
+.success-emoji { font-size: 120rpx; margin-bottom: 16rpx; }
+.success-title { font-size: 40rpx; font-weight: 600; }
+.success-sub { margin-top: 8rpx; margin-bottom: 40rpx; }
+.code-box {
+  display: flex; flex-direction: column; align-items: center;
+  background: #fff5f2; border-radius: 24rpx; padding: 40rpx 0;
+  margin: 24rpx 0;
+}
+.code {
+  font-size: 88rpx; font-weight: 700; letter-spacing: 16rpx; color: #FF7A59;
+  font-family: monospace;
+}
+.copy-hint { font-size: 24rpx; color: #FF7A59; margin-top: 12rpx; }
+.tip { line-height: 1.6; margin: 16rpx 0 32rpx; }
