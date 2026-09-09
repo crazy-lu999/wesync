@@ -41,6 +41,11 @@ exports.main = async (event) => {
     },
   });
 
+  // 同步已有待办的 members，让新成员也能通过读规则 auth.openid in doc.members 读到旧数据
+  await db.collection('todos').where({ familyId: family._id }).update({
+    data: { members: _.addToSet(OPENID) },
+  });
+
   return {
     code: 0,
     message: '加入成功',

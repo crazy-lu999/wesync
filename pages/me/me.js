@@ -64,6 +64,9 @@ Page({
       wx.hideLoading();
       app.globalData.family = null;
       wx.removeStorageSync('familyId');
+      // 清掉本家庭待办缓存，避免退出后仍显示旧数据
+      const fid = this.data.family && this.data.family._id;
+      if (fid) wx.removeStorageSync('todos_' + fid);
       wx.showToast({ title: '已退出', icon: 'success' });
       setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 600);
     } catch (e) {

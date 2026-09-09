@@ -25,7 +25,7 @@
       <text class="muted">· 已完成 {{doneCount}}</text>
     </view>
 
-    <view wx:if="{{todos.length === 0}}" class="empty">
+    <view wx:if="{{todosReady && todos.length === 0}}" class="empty">
       <view class="empty-emoji">📝</view>
       <view class="muted">还没有待办，加一条吧</view>
     </view>
@@ -56,7 +56,9 @@
     </view>
 
     <view class="sync-tip {{subscribing ? 'on' : ''}}">
-      {{subscribing ? '● 已同步，对方改动会实时出现' : '○ 正在连接…'}}
+      <block wx:if="{{!subscribing}}">○ 正在连接…</block>
+      <block wx:elif="{{syncMode === 'realtime'}}">● 实时同步中，对方改动即时可见</block>
+      <block wx:else>● 已同步（轮询）· 对方改动约几秒内出现</block>
     </view>
   </view>
 

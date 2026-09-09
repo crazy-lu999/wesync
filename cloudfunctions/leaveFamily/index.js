@@ -27,6 +27,10 @@ exports.main = async () => {
     await db.collection('families').doc(family._id).update({
       data: { members: remain, memberNicks },
     });
+    // 同步从已有待办的 members 中移除自己（否则读规则会让已离开者读到）
+    await db.collection('todos').where({ familyId: family._id }).update({
+      data: { members: _.pull(OPENID) },
+    });
   }
 
   return { code: 0, message: '已退出', data: { ok: true } };

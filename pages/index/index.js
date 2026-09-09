@@ -1,5 +1,5 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, toggleTodo, removeTodo } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, toggleTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
 const app = getApp();
 
@@ -13,13 +13,12 @@ Page({
     todos: [],
     inputVal: '',
     pollTimer: null,
+    watchClose: null,
     subscribing: false,
+    syncMode: 'poll', // 'realtime' 实时推送 | 'poll' 轮询兜底
+    todosReady: false, // 首次从服务端拉到待办后才置 true（用于区分真假空态）
     activeCount: 0,
     doneCount: 0,
-  },
-
-  onLoad() {
-    this.loadFamily();
   },
 
   onShow() {
@@ -27,16 +26,20 @@ Page({
     if (app.globalData.family !== this.data.family) {
       this.loadFamily();
     }
-    // 重新开始轮询
-    if (this.data.hasFamily) this.startPoll();
+    // 有家庭则开启同步
+    if (this.data.hasFamily) this.syncStart();
   },
 
   onHide() {
-    this.stopPoll();
+    this.syncStop();
   },
 
   onUnload() {
-    this.stopPoll();
+    this.syncStop();
+  },
+
+  onLoad() {
+    this.loadFamily();
   },
 
   async loadFamily() {
@@ -49,11 +52,14 @@ Page({
 
       if (family) {
         const myNick = (family.memberNicks && family.memberNicks[openid]) || '我';
-        this.setData({ loading: false, hasFamily: true, family, myOpenid: openid, myNick });
+        // 先用本地缓存立即可见，避免等云函数返回时空白（首屏秒显）
+        const cached = wx.getStorageSync('todos_' + family._id) || [];
+        if (cached.length) this.renderTodos(cached);
+        this.setData({ loading: false, hasFamily: true, family, myOpenid: openid, myNick, todosReady: !!cached.length });
         wx.setStorageSync('familyId', family._id);
-        this.startPoll();
+        this.syncStart();
       } else {
-        this.stopPoll();
+        this.syncStop();
         wx.removeStorageSync('familyId');
         this.setData({ loading: false, hasFamily: false, family: null, todos: [], myOpenid: openid });
       }
@@ -63,12 +69,40 @@ Page({
     }
   },
 
-  // 定时轮询拉取待办（绕开安全规则 UI）。单位秒
+  // 同步策略：实时推送为主，失败自动降级轮询（永不中断）
+  syncStart() {
+    const familyId = this.data.family && this.data.family._id;
+    if (!familyId) return;
+    this.syncStop();
+    this.setData({ subscribing: true, syncMode: 'realtime' });
+    this.fetchTodos(); // 立即拉一次，保证首屏
+    this.watchClose = subscribeTodos(
+      familyId,
+      (todos) => {
+        this.renderTodos(todos || []);
+        this.setData({ syncMode: 'realtime' });
+      },
+      (err) => {
+        // watch 不可用（未开通实时推送/未配读规则）→ 降级为轮询
+        console.warn('[sync] watch 不可用，降级为轮询', err);
+        this.setData({ syncMode: 'poll' });
+        this.startPoll();
+      }
+    );
+  },
+
+  syncStop() {
+    if (this.watchClose) {
+      try { this.watchClose(); } catch (e) { /* ignore */ }
+      this.watchClose = null;
+    }
+    this.stopPoll();
+    this.setData({ subscribing: false });
+  },
+
   startPoll() {
     this.stopPoll();
-    this.fetchTodos();
-    this.setData({ subscribing: true });
-    this.data.pollTimer = setInterval(() => this.fetchTodos(), 5000);
+    this.data.pollTimer = setInterval(() => this.fetchTodos(), 3000);
   },
 
   stopPoll() {
@@ -82,7 +116,10 @@ Page({
     try {
       const data = await getMyTodos();
       this.renderTodos(data.todos || []);
-      this.setData({ subscribing: true });
+      this.setData({ todosReady: true });
+      // 缓存本次服务端快照，下次进入秒显
+      const familyId = this.data.family && this.data.family._id;
+      if (familyId) wx.setStorageSync('todos_' + familyId, data.todos || []);
     } catch (e) {
       this.setData({ subscribing: false });
     }
@@ -94,14 +131,15 @@ Page({
       timeText: fmtTime(t.createTime),
       mine: t.creatorOpenid === this.data.myOpenid,
     }));
-    mapped.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+    // 未完成在前，同类按创建时间倒序
+    mapped.sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      const ta = a.createTime ? +new Date(a.createTime) : 0;
+      const tb = b.createTime ? +new Date(b.createTime) : 0;
+      return tb - ta;
+    });
     const doneCount = mapped.filter((t) => t.done).length;
     this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount });
-  },
-
-  closeWatch() {
-    this.stopPoll();
-    this.setData({ subscribing: false });
   },
 
   onInput(e) {
@@ -115,6 +153,7 @@ Page({
     wx.showLoading({ title: '添加中' });
     try {
       await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick);
+      this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
       wx.hideLoading();
     } catch (e) {
       wx.hideLoading();
@@ -132,6 +171,7 @@ Page({
     this.applyToggle(index, done);
     try {
       await toggleTodo(id, done);
+      this.fetchTodos(); // 立刻对齐服务端真实状态
     } catch (err) {
       this.setData({ todos: prev });
       wx.showToast({ title: '网络异常', icon: 'none' });
@@ -161,6 +201,7 @@ Page({
     wx.showLoading({ title: '删除中' });
     try {
       await removeTodo(id);
+      this.fetchTodos(); // 立刻刷新，删除零延迟生效
       wx.hideLoading();
     } catch (e) {
       wx.hideLoading();

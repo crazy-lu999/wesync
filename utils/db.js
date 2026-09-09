@@ -1,5 +1,6 @@
 // utils/db.js — 云数据库与云函数封装
-// 待办走客户端直连云数据库（支持 watch 实时订阅）；
+// 待办读取用客户端 watch 实时订阅（即时反映对方改动），失败自动降级为轮询；
+// 待办写入走云函数 todoOps（服务端写，openid 不可伪造，且不依赖客户端写规则）；
 // 家庭相关走云函数（openid 由云端取，不可伪造）。
 
 const db = wx.cloud.database();
@@ -44,12 +45,12 @@ async function removeTodo(id) {
 // 服务端读当前家庭待办（绕过脆弱的客户端 read 规则，稳定可靠）
 const getMyTodos = () => call('getMyTodos', {});
 
-// 实时订阅本家庭 todos。返回关闭函数。
+// 实时订阅本家庭 todos（客户端 watch）。返回关闭函数。
+// 注意：实时推送不支持 orderBy，排序由前端 renderTodos 完成。
+// 需第 3 方源：todos 集合开通「实时数据推送」并配读规则 auth.openid in doc.members。
 function subscribeTodos(familyId, onChange, onError) {
   const watcher = todos
     .where({ familyId })
-    .orderBy('done', 'asc')
-    .orderBy('createTime', 'desc')
     .watch({
       onChange(snapshot) {
         if (snapshot.type === 'init') {
