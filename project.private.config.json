@@ -1,19 +1,7 @@
 {
   "libVersion": "3.17.0",
-  "projectname": "shared-todo",
-  "condition": {
-    "miniprogram": {
-      "list": [
-        {
-          "name": "pages/index/index",
-          "pathName": "pages/index/index",
-          "query": "",
-          "scene": null,
-          "launchMode": "default"
-        }
-      ]
-    }
-  },
+  "projectname": "wesync",
+  "condition": {},
   "setting": {
     "urlCheck": true,
     "coverView": false,

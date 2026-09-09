@@ -31,7 +31,7 @@
   },
   "cloudfunctionRoot": "cloudfunctions/",
   "compileType": "miniprogram",
-  "libVersion": "2.10.4",
+  "libVersion": "3.17.0",
   "condition": {},
   "simulatorPluginLibVersion": {},
   "packOptions": {
