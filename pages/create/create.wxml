@@ -1,30 +1,40 @@
 <!--pages/create/create.wxml-->
 <view class="page">
-  <view wx:if="{{!result}}" class="form card">
-    <view class="title">创建家庭</view>
+  <view wx:if="{{!result}}" class="head">
+    <view class="head-emoji">✨</view>
+    <view class="head-title">创建家庭</view>
+    <view class="muted head-sub">给你们的清单起个名字吧</view>
+  </view>
 
+  <view wx:if="{{!result}}" class="form card">
     <view class="field">
       <view class="label">家庭名称</view>
-      <input
-        class="input-line"
-        data-field="familyName"
-        value="{{familyName}}"
-        bindinput="onInput"
-        placeholder="比如：我们的家"
-        maxlength="20"
-      />
+      <view class="input-wrap">
+        <text class="input-icon">🏷️</text>
+        <input
+          class="input-line"
+          data-field="familyName"
+          value="{{familyName}}"
+          bindinput="onInput"
+          placeholder="比如：我们的家"
+          maxlength="20"
+        />
+      </view>
     </view>
 
     <view class="field">
       <view class="label">你的昵称（对方会看到）</view>
-      <input
-        class="input-line"
-        data-field="myNick"
-        value="{{myNick}}"
-        bindinput="onInput"
-        placeholder="比如：老公 / 老婆"
-        maxlength="10"
-      />
+      <view class="input-wrap">
+        <text class="input-icon">🙋</text>
+        <input
+          class="input-line"
+          data-field="myNick"
+          value="{{myNick}}"
+          bindinput="onInput"
+          placeholder="比如：老公 / 老婆"
+          maxlength="10"
+        />
+      </view>
     </view>
 
     <button class="btn-primary submit" bindtap="onSubmit" disabled="{{submitting}}">
@@ -32,7 +42,7 @@
     </button>
   </view>
 
-  <view wx:else class="success card">
+  <view wx:else class="success">
     <view class="success-emoji">🎉</view>
     <view class="success-title">家庭已创建</view>
     <view class="muted success-sub">把这个邀请码发给另一半</view>

@@ -1,23 +1,47 @@
 /* pages/create/create.wxss */
 .page { padding-top: 40rpx; }
-.form, .success { padding: 48rpx 32rpx; }
-.title { font-size: 40rpx; font-weight: 600; margin-bottom: 40rpx; text-align: center; }
-.field { margin-bottom: 32rpx; }
-.label { font-size: 26rpx; color: #888; margin-bottom: 12rpx; }
-.submit { margin-top: 24rpx; width: 100%; }
 
-.success { text-align: center; }
-.success-emoji { font-size: 120rpx; margin-bottom: 16rpx; }
-.success-title { font-size: 40rpx; font-weight: 600; }
-.success-sub { margin-top: 8rpx; margin-bottom: 40rpx; }
+.head {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48rpx 0 32rpx;
+}
+.head-emoji {
+  font-size: 96rpx; margin-bottom: 20rpx;
+  filter: drop-shadow(0 10rpx 20rpx rgba(255, 111, 94, 0.25));
+}
+.head-title { font-size: 44rpx; font-weight: 800; letter-spacing: 1rpx; }
+.head-sub { margin-top: 12rpx; }
+
+.form { padding: 44rpx 36rpx; }
+.field { margin-bottom: 36rpx; }
+.label { font-size: 26rpx; color: #8C8784; margin-bottom: 14rpx; font-weight: 500; }
+.input-wrap {
+  display: flex; align-items: center; gap: 16rpx;
+  background: #F7F5F4; border-radius: 20rpx; padding: 0 24rpx;
+  border: 2rpx solid transparent;
+}
+.input-wrap:focus-within { border-color: rgba(255, 111, 94, 0.4); }
+.input-icon { font-size: 30rpx; }
+.input-wrap .input-line { flex: 1; background: transparent; padding: 28rpx 0; }
+
+.submit { margin-top: 12rpx; width: 100%; }
+
+.success { padding: 48rpx 48rpx; text-align: center; }
+.success-emoji {
+  font-size: 130rpx; margin-bottom: 20rpx;
+  filter: drop-shadow(0 16rpx 28rpx rgba(255, 111, 94, 0.28));
+}
+.success-title { font-size: 44rpx; font-weight: 800; }
+.success-sub { margin-top: 14rpx; margin-bottom: 48rpx; }
 .code-box {
   display: flex; flex-direction: column; align-items: center;
-  background: #fff5f2; border-radius: 24rpx; padding: 40rpx 0;
-  margin: 24rpx 0;
+  background: linear-gradient(135deg, #FFF3EF, #FFE9E2);
+  border-radius: 28rpx; padding: 48rpx 0;
+  margin: 24rpx 0 36rpx; border: 2rpx dashed rgba(255, 111, 94, 0.35);
 }
 .code {
-  font-size: 88rpx; font-weight: 700; letter-spacing: 16rpx; color: #FF7A59;
-  font-family: monospace;
+  font-size: 92rpx; font-weight: 800; letter-spacing: 16rpx; color: #FF6F5E;
+  font-family: "SF Mono", Menlo, monospace; text-indent: 16rpx;
 }
-.copy-hint { font-size: 24rpx; color: #FF7A59; margin-top: 12rpx; }
-.tip { line-height: 1.6; margin: 16rpx 0 32rpx; }
+.copy-hint { font-size: 24rpx; color: #FF6F5E; margin-top: 16rpx; }
+.tip { line-height: 1.7; margin: 0 0 40rpx; }

@@ -2,13 +2,15 @@
 <view class="page">
 
   <!-- 加载中 -->
-  <view wx:if="{{loading}}" class="loading">加载中…</view>
+  <view wx:if="{{loading}}" class="loading">
+    <view class="spinner"></view>
+  </view>
 
   <!-- 无家庭：引导 -->
   <view wx:elif="{{!hasFamily}}" class="guide">
     <view class="guide-emoji">🏡</view>
     <view class="guide-title">建立一个你们的小家</view>
-    <view class="guide-sub muted">创建家庭后把邀请码发给另一半，两人就能共享同一个待办清单啦</view>
+    <view class="guide-sub muted">创建家庭后把邀请码发给另一半，<br/>两人就能共享同一个待办清单啦</view>
     <button class="btn-primary guide-btn" bindtap="goCreate">创建家庭</button>
     <button class="btn-ghost guide-btn" bindtap="goJoin">我有邀请码，加入</button>
   </view>
@@ -16,13 +18,26 @@
   <!-- 有家庭：列表 -->
   <view wx:else class="list-wrap">
     <view class="topbar">
-      <view class="family-name">🏠 {{family.name}}</view>
-      <view class="me-btn" bindtap="goMe">我的 ›</view>
+      <view class="family-name">
+        <view class="fam-dot">🏠</view>
+        <text>{{family.name}}</text>
+      </view>
+      <view class="me-btn" bindtap="goMe">
+        <text>我的</text>
+        <text class="chev">›</text>
+      </view>
     </view>
 
     <view class="stat">
-      <text>待办 {{activeCount}}</text>
-      <text class="muted">· 已完成 {{doneCount}}</text>
+      <view class="stat-item">
+        <view class="stat-num brand">{{activeCount}}</view>
+        <view class="stat-label">待办</view>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <view class="stat-num">{{doneCount}}</view>
+        <view class="stat-label">已完成</view>
+      </view>
     </view>
 
     <view wx:if="{{todosReady && todos.length === 0}}" class="empty">
@@ -44,7 +59,9 @@
           data-id="{{item._id}}"
           data-index="{{index}}"
           catchtap="onToggle"
-        >✓</view>
+        >
+          <text class="check-mark" wx:if="{{item.done}}">✓</text>
+        </view>
         <view class="todo-main">
           <view class="todo-content">{{item.content}}</view>
           <view class="todo-meta">
@@ -56,9 +73,15 @@
     </view>
 
     <view class="sync-tip {{subscribing ? 'on' : ''}}">
-      <block wx:if="{{!subscribing}}">○ 正在连接…</block>
-      <block wx:elif="{{syncMode === 'realtime'}}">● 实时同步中，对方改动即时可见</block>
-      <block wx:else>● 已同步（轮询）· 对方改动约几秒内出现</block>
+      <block wx:if="{{!subscribing}}">
+        <text class="sync-dot gray">●</text> 正在连接…
+      </block>
+      <block wx:elif="{{syncMode === 'realtime'}}">
+        <text class="sync-dot green">●</text> 实时同步中，对方改动即时可见
+      </block>
+      <block wx:else>
+        <text class="sync-dot amber">●</text> 已同步 · 对方改动约几秒内出现
+      </block>
     </view>
   </view>
 

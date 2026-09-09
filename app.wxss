@@ -1,7 +1,8 @@
-/* app.wxss — 全局样式 */
+/* app.wxss — 全局样式（设计系统） */
 page {
-  background: #f5f5f7;
-  color: #333;
+  /* 品牌渐变装饰背景：柔和暖色，从上到下由浅入深 */
+  background: linear-gradient(180deg, #FFF4F0 0%, #F7F3F0 220rpx, #F6F6F8 100%);
+  color: #2A2626;
   font-size: 30rpx;
   font-family: -apple-system, "PingFang SC", "Helvetica Neue", Helvetica, sans-serif;
   min-height: 100vh;
@@ -10,39 +11,61 @@ page {
 
 view, text { box-sizing: border-box; }
 
+/* 品牌色 */
+.brand { color: #FF6F5E; }
+
+/* 主按钮：品牌渐变 + 轻投影 + 按压反馈 */
 .btn-primary {
-  background: #FF7A59;
   color: #fff;
-  border-radius: 999rpx;
+  border-radius: 48rpx;
   font-size: 32rpx;
-  height: 88rpx;
-  line-height: 88rpx;
+  font-weight: 600;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: linear-gradient(135deg, #FF6F5E 0%, #FF917A 100%);
+  box-shadow: 0 12rpx 28rpx rgba(255, 111, 94, 0.32);
+  border: none;
+  transition: transform 0.1s, opacity 0.1s;
 }
-.btn-primary[disabled] { background: #ffb39e; color: #fff; }
+.btn-primary::after { border: none; }
+.btn-primary[disabled],
+.btn-primary.disabled {
+  background: #E8E3E0;
+  color: #B8B2AF;
+  box-shadow: none;
+}
 
 .btn-ghost {
-  background: #fff;
-  color: #FF7A59;
-  border: 2rpx solid #FF7A59;
-  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.9);
+  color: #FF6F5E;
+  border: 2rpx solid rgba(255, 111, 94, 0.35);
+  border-radius: 48rpx;
   font-size: 32rpx;
-  height: 88rpx;
-  line-height: 88rpx;
+  font-weight: 600;
+  height: 96rpx;
+  line-height: 96rpx;
 }
+.btn-ghost::after { border: none; }
 
+/* 卡片：白底 + 柔光阴影 + 细描边 */
 .card {
   background: #fff;
-  border-radius: 20rpx;
-  padding: 32rpx;
+  border-radius: 28rpx;
+  padding: 36rpx;
   margin: 24rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.04);
+  box-shadow: 0 12rpx 40rpx rgba(80, 40, 20, 0.06);
+  border: 1rpx solid rgba(255, 117, 95, 0.06);
 }
 
 .input-line {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
+  background: #F7F5F4;
+  border-radius: 20rpx;
+  padding: 28rpx 32rpx;
   font-size: 30rpx;
+  color: #2A2626;
+  border: 2rpx solid transparent;
 }
+.input-line:focus { border-color: rgba(255, 111, 94, 0.4); }
+.input-line::-webkit-input-placeholder { color: #C4BFBC; }
 
-.muted { color: #999; font-size: 26rpx; }
+.muted { color: #A09B98; font-size: 26rpx; }

@@ -1,8 +1,12 @@
 <!--pages/join/join.wxml-->
 <view class="page">
-  <view class="form card">
-    <view class="title">加入家庭</view>
+  <view class="head">
+    <view class="head-emoji">🔑</view>
+    <view class="head-title">加入家庭</view>
+    <view class="muted head-sub">输入 TA 发你的 6 位邀请码</view>
+  </view>
 
+  <view class="form card">
     <view class="field">
       <view class="label">邀请码（6 位数字）</view>
       <input
@@ -18,14 +22,17 @@
 
     <view class="field">
       <view class="label">你的昵称（对方会看到）</view>
-      <input
-        class="input-line"
-        data-field="myNick"
-        value="{{myNick}}"
-        bindinput="onInput"
-        placeholder="比如：老公 / 老婆"
-        maxlength="10"
-      />
+      <view class="input-wrap">
+        <text class="input-icon">🙋</text>
+        <input
+          class="input-line"
+          data-field="myNick"
+          value="{{myNick}}"
+          bindinput="onInput"
+          placeholder="比如：老公 / 老婆"
+          maxlength="10"
+        />
+      </view>
     </view>
 
     <button class="btn-primary submit" bindtap="onSubmit" disabled="{{submitting}}">

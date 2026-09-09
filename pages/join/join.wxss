@@ -1,11 +1,35 @@
 /* pages/join/join.wxss */
 .page { padding-top: 40rpx; }
-.form { padding: 48rpx 32rpx; }
-.title { font-size: 40rpx; font-weight: 600; margin-bottom: 40rpx; text-align: center; }
-.field { margin-bottom: 32rpx; }
-.label { font-size: 26rpx; color: #888; margin-bottom: 12rpx; }
-.code-input {
-  font-size: 52rpx; letter-spacing: 16rpx; font-weight: 600; text-align: center;
-  color: #FF7A59; font-family: monospace;
+
+.head {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48rpx 0 32rpx;
 }
-.submit { margin-top: 24rpx; width: 100%; }
+.head-emoji {
+  font-size: 96rpx; margin-bottom: 20rpx;
+  filter: drop-shadow(0 10rpx 20rpx rgba(255, 111, 94, 0.25));
+}
+.head-title { font-size: 44rpx; font-weight: 800; letter-spacing: 1rpx; }
+.head-sub { margin-top: 12rpx; }
+
+.form { padding: 44rpx 36rpx; }
+.field { margin-bottom: 36rpx; }
+.label { font-size: 26rpx; color: #8C8784; margin-bottom: 14rpx; font-weight: 500; }
+
+.code-input {
+  font-size: 60rpx; letter-spacing: 20rpx; font-weight: 800; text-align: center;
+  color: #FF6F5E; font-family: "SF Mono", Menlo, monospace; text-indent: 20rpx;
+  background: #F7F5F4;
+}
+.code-input:focus { border-color: rgba(255, 111, 94, 0.4); }
+
+.input-wrap {
+  display: flex; align-items: center; gap: 16rpx;
+  background: #F7F5F4; border-radius: 20rpx; padding: 0 24rpx;
+  border: 2rpx solid transparent;
+}
+.input-wrap:focus-within { border-color: rgba(255, 111, 94, 0.4); }
+.input-icon { font-size: 30rpx; }
+.input-wrap .input-line { flex: 1; background: transparent; padding: 28rpx 0; }
+
+.submit { margin-top: 12rpx; width: 100%; }
