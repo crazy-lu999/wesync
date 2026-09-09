@@ -26,6 +26,7 @@ shared-todo/
     ├── joinFamily/                   # 凭码加入（满员/码错校验，同步旧待办 members）
     ├── getMyFamily/                  # 查当前用户家庭
     ├── leaveFamily/                  # 退出（最后一人离开则清理数据，移除旧待办 members）
+    ├── updateNickname/               # 修改自己在本家庭中的昵称
     ├── todoOps/                      # 待办增删改（服务端写，带成员列表）
     └── getMyTodos/                   # 待办读取（服务端读 + 降级轮询）
 ```
@@ -60,8 +61,8 @@ shared-todo/
 
 ### 3. 部署云函数
 在开发者工具左侧 `cloudfunctions` 目录下，**右键每个云函数文件夹** →
-「上传并部署：云端安装依赖（不上传 node_modules）」。共 6 个：
-`createFamily`、`joinFamily`、`getMyFamily`、`leaveFamily`、`todoOps`、`getMyTodos`。
+「上传并部署：云端安装依赖（不上传 node_modules）」。共 7 个：
+`createFamily`、`joinFamily`、`getMyFamily`、`leaveFamily`、`updateNickname`、`todoOps`、`getMyTodos`。
 
 ### 4. 预览
 点「预览」生成二维码，微信扫码在手机上打开。
@@ -76,6 +77,7 @@ shared-todo/
 1. **A**：打开小程序 →「创建家庭」→ 填昵称 → 得到 6 位邀请码 → 复制发给 B。
 2. **B**：打开小程序 →「我有邀请码，加入」→ 输入码 + 昵称 → 进入共享清单。
 3. 任一方添加/勾选/删除待办，对方列表**实时推送即时刷新**（未开通推送则约 3 秒内）出现。
+4. 想改自己的昵称：进「我的」页 → 轻点「我的昵称」卡片 → 输入新昵称 →「保存」，对方看到的昵称同步更新；之后新建的待办也会带上新昵称。
 
 ## 验证清单
 
@@ -86,6 +88,7 @@ shared-todo/
 - [ ] 错误邀请码提示「邀请码不存在」
 - [ ] 第三个号加入提示「家庭已满员」
 - [ ] 退出家庭后回引导页，对方仍正常
+- [ ] 在「我的」页改自己的昵称，保存后本页与对方看到同步更新
 
 ## 技术要点
 
@@ -96,4 +99,5 @@ shared-todo/
 - **读写分离**：待办**写**（`todoOps`）和家庭读写全走云函数（服务端），客户端只对 `todos` 做受规则约束的**读**（`auth.openid in doc.members`），不依赖脆弱的客户端写规则。
 - **members 一致性**：`joinFamily`/`leaveFamily` 会同步新旧成员的 `todos.members`，避免新成员读不到旧待办、或已退出者仍能读到。
 - **邀请码唯一性**：生成后查 `count()`，重复则重生成，最多重试 20 次。
+- **昵称可改**：昵称存于家庭文档 `memberNicks[openid]`，`updateNickname` 云函数按当前 openid 点号路径单独更新，只改自己不动他人；昵称会用于新建待办的创建者标注。
 - **乐观更新**：勾选先改本地 UI 再写库，失败回滚，体验流畅。

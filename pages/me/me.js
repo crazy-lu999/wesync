@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname } = require('../../utils/db.js');
 const app = getApp();
 
 // 由 (family, openid) 生成页面视图数据
@@ -21,6 +21,8 @@ Page({
     myNick: '我',
     members: [], // [{ openid, nick, me }]
     loading: true,
+    editingNick: false,
+    nickInput: '',
   },
 
   onShow() {
@@ -68,6 +70,38 @@ Page({
       data: this.data.family.inviteCode,
       success: () => wx.showToast({ title: '已复制邀请码', icon: 'success' }),
     });
+  },
+
+  onEditNick() {
+    this.setData({ nickInput: this.data.myNick || '', editingNick: true });
+  },
+
+  onCancelNick() {
+    this.setData({ editingNick: false, nickInput: '' });
+  },
+
+  onNickInput(e) {
+    this.setData({ nickInput: e.detail.value });
+  },
+
+  async onSaveNick() {
+    const nick = (this.data.nickInput || '').trim();
+    if (!nick) {
+      wx.showToast({ title: '昵称不能为空', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中' });
+    try {
+      await updateNickname(nick);
+      // 刷新拿到最新成员昵称（含其它成员的更新）
+      await this.load();
+      wx.hideLoading();
+      this.setData({ editingNick: false, nickInput: '' });
+      wx.showToast({ title: '已保存', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
   },
 
   onLeave() {

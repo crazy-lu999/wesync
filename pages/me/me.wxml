@@ -27,6 +27,39 @@
       </view>
     </view>
 
+    <!-- 我的昵称 -->
+    <view class="card">
+      <view class="card-title">
+        <text class="card-title-icon">🏷️</text>
+        <text>我的昵称</text>
+        <text class="nick-hint">轻点可改</text>
+      </view>
+      <!-- 展示态：轻点昵称即可编辑 -->
+      <view wx:if="{{!editingNick}}" class="nick-row" hover-class="nick-row-hover" bindtap="onEditNick">
+        <view class="nick-view">
+          <view class="avatar mine nick-avatar">{{myNick[0]}}</view>
+          <view class="nick-name">{{myNick}}</view>
+        </view>
+        <view class="nick-edit">✏️</view>
+      </view>
+      <!-- 编辑态 -->
+      <view wx:else class="nick-row">
+        <input
+          class="nick-input"
+          value="{{nickInput}}"
+          focus
+          maxlength="20"
+          bindinput="onNickInput"
+          bindconfirm="onSaveNick"
+          placeholder="输入新昵称"
+        />
+        <view class="nick-actions">
+          <view class="copy-btn" bindtap="onCancelNick">取消</view>
+          <view class="save-btn" bindtap="onSaveNick">保存</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 邀请码卡 -->
     <view class="card invite-card">
       <view class="card-title">

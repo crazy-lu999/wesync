@@ -21,6 +21,7 @@ const createFamily = (familyName, myNick) => call('createFamily', { familyName, 
 const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNick });
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
+const updateNickname = (nick) => call('updateNickname', { nick });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
@@ -74,6 +75,7 @@ module.exports = {
   joinFamily,
   getMyFamily,
   leaveFamily,
+  updateNickname,
   addTodo,
   toggleTodo,
   removeTodo,

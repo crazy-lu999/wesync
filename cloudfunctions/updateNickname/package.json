@@ -1,0 +1,9 @@
+{
+  "name": "updateNickname",
+  "version": "1.0.0",
+  "description": "修改当前用户在自己家庭中的昵称",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
