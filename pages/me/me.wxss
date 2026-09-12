@@ -92,6 +92,29 @@
 }
 .tip { font-size: 24rpx; margin-top: 20rpx; color: #B8B2AF; }
 
+/* 我的提醒 */
+.reminder-list { display: flex; flex-direction: column; }
+.reminder-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20rpx 0; border-top: 1rpx solid #F3EFED;
+}
+.reminder-item:first-child { border-top: none; padding-top: 4rpx; }
+.reminder-main { flex: 1; min-width: 0; margin-right: 20rpx; }
+.reminder-content {
+  font-size: 30rpx; font-weight: 600; color: #2A2626;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reminder-meta {
+  margin-top: 10rpx; display: flex; align-items: center; gap: 16rpx;
+  font-size: 24rpx;
+}
+.reminder-time { color: #FF6F5E; font-weight: 600; }
+.reminder-remain { color: #B8B2AF; }
+.reminder-cancel {
+  flex: none; color: #FF6F5E; font-size: 24rpx; font-weight: 600;
+  background: #FFF1EC; padding: 12rpx 24rpx; border-radius: 999rpx;
+}
+
 /* 退出 */
 .action-card { padding: 24rpx; }
 .leave-btn {

@@ -1,6 +1,7 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, toggleTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
-const { fmtTime } = require('../../utils/format.js');
+const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
+const { fmtTime, fmtDateTime } = require('../../utils/format.js');
+const { REMIND_TMPL_ID } = require('../../utils/config.js');
 const app = getApp();
 
 Page({
@@ -19,6 +20,19 @@ Page({
     todosReady: false, // 首次从服务端拉到待办后才置 true（用于区分真假空态）
     activeCount: 0,
     doneCount: 0,
+    // 长按操作面板
+    menuVisible: false,
+    menuId: '', // 当前长按选中的待办 id
+    menuContent: '', // 待办摘要，用于删除确认预览
+    confirmDelete: false, // 面板切到删除确认态
+    // 编辑态
+    editing: false,
+    editingId: '',
+    inputFocus: false,
+    // 提醒
+    remindOn: false,
+    remindDate: '',
+    remindTime: '09:00',
   },
 
   onShow() {
@@ -129,6 +143,7 @@ Page({
     const mapped = todos.map((t) => ({
       ...t,
       timeText: fmtTime(t.createTime),
+      remindText: t.remindAt ? ('🔔 ' + fmtDateTime(t.remindAt)) : '',
       mine: t.creatorOpenid === this.data.myOpenid,
     }));
     // 未完成在前，同类按创建时间倒序
@@ -149,10 +164,24 @@ Page({
   async onAdd() {
     const content = (this.data.inputVal || '').trim();
     if (!content) return;
-    this.setData({ inputVal: '' });
+    if (this.data.editing) {
+      await this.saveEdit(content);
+      return;
+    }
+    // 开了提醒 → 先请求一次订阅授权（一次性）；拒绝则仍添加但不设提醒
+    let remindAt = 0;
+    if (this.data.remindOn) {
+      const t = new Date(`${this.data.remindDate} ${this.data.remindTime}:00`).getTime();
+      if (!isNaN(t)) {
+        const accept = await this.requestSubscribe();
+        if (accept) remindAt = t;
+        else wx.showToast({ title: '未授权，本次不设提醒', icon: 'none' });
+      }
+    }
+    this.setData({ inputVal: '', remindOn: false });
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick);
+      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, remindAt || '');
       this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
       wx.hideLoading();
     } catch (e) {
@@ -160,6 +189,33 @@ Page({
       wx.showToast({ title: e.message || '添加失败', icon: 'none' });
     }
   },
+
+  // —— 提醒 ——
+  _pad(n) { return n < 10 ? '0' + n : '' + n; },
+  toggleRemind() {
+    if (!this.data.remindOn) {
+      const now = new Date();
+      this.setData({
+        remindOn: true,
+        remindDate: `${now.getFullYear()}-${this._pad(now.getMonth() + 1)}-${this._pad(now.getDate())}`,
+      });
+    } else {
+      this.setData({ remindOn: false });
+    }
+  },
+  onRemindDateChange(e) { this.setData({ remindDate: e.detail.value }); },
+  onRemindTimeChange(e) { this.setData({ remindTime: e.detail.value }); },
+  // 请求一次性订阅授权，返回用户是否接受
+  requestSubscribe() {
+    return new Promise((resolve) => {
+      wx.requestSubscribeMessage({
+        tmplIds: [REMIND_TMPL_ID],
+        success: (res) => resolve(res[REMIND_TMPL_ID] === 'accept'),
+        fail: () => resolve(false),
+      });
+    });
+  },
+
 
   async onToggle(e) {
     const { id, index } = e.currentTarget.dataset;
@@ -188,13 +244,67 @@ Page({
 
   onLongPress(e) {
     const { id } = e.currentTarget.dataset;
-    wx.showModal({
-      title: '删除待办',
-      content: '确定删除这条吗？',
-      success: (res) => {
-        if (res.confirm) this.doRemove(id);
-      },
+    const todo = this.data.todos.find((t) => t._id === id);
+    this.setData({ menuId: id, menuContent: todo ? todo.content : '', menuVisible: true });
+  },
+
+  // —— 底部操作面板 ——
+  closeMenu() {
+    this.setData({ menuVisible: false, menuId: '', menuContent: '', confirmDelete: false });
+  },
+
+  noop() {},
+
+  // 菜单：编辑
+  onMenuEdit() {
+    const todo = this.data.todos.find((t) => t._id === this.data.menuId);
+    this.setData({
+      menuVisible: false,
+      confirmDelete: false,
+      editing: true,
+      editingId: this.data.menuId,
+      inputVal: todo ? todo.content : '',
+      inputFocus: true,
     });
+  },
+
+  // 菜单：删除 → 面板内二段式确认
+  onMenuDelete() {
+    this.setData({ confirmDelete: true });
+  },
+
+  // 确认删除：真正执行
+  async confirmRemove() {
+    const id = this.data.menuId;
+    this.closeMenu();
+    wx.showLoading({ title: '删除中' });
+    try {
+      await removeTodo(id);
+      this.fetchTodos(); // 立刻刷新，删除零延迟生效
+      wx.hideLoading();
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '删除失败', icon: 'none' });
+    }
+  },
+
+
+  // 取消编辑
+  cancelEdit() {
+    this.setData({ editing: false, editingId: '', inputVal: '', inputFocus: false });
+  },
+
+  async saveEdit(content) {
+    wx.showLoading({ title: '保存中' });
+    try {
+      await editTodo(this.data.editingId, content);
+      this.cancelEdit();
+      this.fetchTodos(); // 立刻刷新，编辑零延迟可见
+      wx.hideLoading();
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
   },
 
   async doRemove(id) {

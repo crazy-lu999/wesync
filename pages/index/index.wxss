@@ -1,5 +1,5 @@
 /* pages/index/index.wxss */
-.page { padding-bottom: 160rpx; }
+.page { padding-bottom: 200rpx; }
 
 /* 加载中 spinner */
 .loading { padding: 260rpx 0; text-align: center; }
@@ -99,35 +99,82 @@
 .todo-item.done .todo-content { text-decoration: line-through; color: #B8B2AF; }
 .todo-meta {
   margin-top: 12rpx; font-size: 24rpx; gap: 16rpx;
-  display: flex; align-items: center; color: #A09B98;
+  display: flex; align-items: center; flex-wrap: wrap; row-gap: 10rpx;
+  color: #A09B98;
 }
 .creator {
   background: #F4F2F1; color: #8C8784; padding: 4rpx 18rpx; border-radius: 999rpx;
   font-size: 22rpx; font-weight: 500;
 }
 .creator.mine { background: #FFEFEA; color: #FF6F5E; }
+.remind-tag {
+  display: inline-flex; align-items: center; gap: 6rpx;
+  color: #FF6F5E; font-weight: 600; font-size: 22rpx;
+  background: #FFF4F0; padding: 4rpx 16rpx; border-radius: 999rpx;
+}
 
 /* 同步提示 */
 .sync-tip {
   text-align: center; font-size: 22rpx; color: #B8B2AF;
   padding: 20rpx 0 8rpx;
-}
-.sync-dot { margin-right: 8rpx; }
+}.sync-dot { margin-right: 8rpx; }
 .sync-dot.green { color: #52C41A; }
 .sync-dot.gray { color: #C4BFBC; }
 .sync-dot.amber { color: #FAAD14; }
 .sync-tip.on { color: #8C8784; }
 
-/* 输入栏 */
+/* 输入栏：外层固定容器 + 内层输入条 */
+.input-wrap {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: linear-gradient(0deg, rgba(255,255,255,0.98) 75%, rgba(255,255,255,0) 100%);
+  padding-top: 6rpx;
+}
 .input-bar {
-  position: fixed; left: 0; right: 0; bottom: 0;
   display: flex; align-items: center; gap: 16rpx;
-  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.92);
+  padding: 20rpx 24rpx;
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: saturate(180%) blur(20rpx);
   border-top: 1rpx solid rgba(0, 0, 0, 0.04);
 }
+/* 提醒开关 */
+.remind-chip {
+  flex: none; width: 88rpx; height: 88rpx; border-radius: 50%;
+  border: none; padding: 0;
+  background: #F4F2F1; font-size: 38rpx; line-height: 88rpx;
+  transition: background 0.2s;
+}
+.remind-chip::after { border: none; }
+.remind-chip.on {
+  background: linear-gradient(135deg, #FF6F5E, #FF917A);
+  box-shadow: 0 8rpx 18rpx rgba(255, 111, 94, 0.3);
+}
+/* 提醒时间选择行 */
+.remind-row {
+  display: flex; align-items: center; justify-content: center; gap: 14rpx;
+  margin: 8rpx 24rpx 14rpx; padding: 18rpx 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 22rpx;
+  box-shadow: 0 8rpx 24rpx rgba(80, 40, 20, 0.06);
+}
+.remind-label {
+  font-size: 26rpx; font-weight: 600; color: #FF6F5E; margin-right: 8rpx;
+}
+.remind-pick {
+  background: #FFF4F0; color: #FF6F5E;
+  padding: 10rpx 22rpx; border-radius: 999rpx;
+  font-size: 26rpx; font-weight: 600;
+}
+.remind-sep { color: #C4BFBC; }
+
 .input-bar .input-line { flex: 1; }
+.input-bar .input-line.editing { border-color: rgba(255, 111, 94, 0.4); background: #FFF6F3; }
+.edit-cancel {
+  flex: none; border: none; background: #F4F2F1; color: #8C8784;
+  border-radius: 999rpx; height: 76rpx; line-height: 76rpx;
+  padding: 0 32rpx; font-size: 28rpx; font-weight: 500;
+}
+.edit-cancel::after { border: none; }
 .add-btn {
   flex: none; color: #fff; border: none;
   border-radius: 48rpx; height: 88rpx; line-height: 88rpx;
@@ -137,3 +184,74 @@
 }
 .add-btn::after { border: none; }
 .add-btn.disable { background: #E8E3E0; color: #C4BFBC; box-shadow: none; }
+.add-btn.edit { padding: 0 44rpx; }
+
+/* —— 长按操作面板（底部 Semial 菜单）—— */
+.sheet-mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(42, 38, 38, 0.42);
+  backdrop-filter: blur(6rpx);
+  z-index: 100;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  background: #fff;
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 16rpx 0 calc(24rpx + env(safe-area-inset-bottom));
+  padding-left: 36rpx; padding-right: 36rpx;
+  box-shadow: 0 -12rpx 40rpx rgba(80, 40, 20, 0.12);
+  animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes slideUp { from { transform: translateY(40%); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
+.sheet-handle {
+  width: 72rpx; height: 8rpx; border-radius: 8rpx;
+  background: #E2DDDA; margin: 8rpx auto 24rpx;
+}
+.sheet-title {
+  text-align: center; color: #A09B98; font-size: 24rpx;
+  margin-bottom: 18rpx; letter-spacing: 1rpx;
+}
+.sheet-item {
+  display: flex; align-items: center; gap: 22rpx;
+  padding: 30rpx 24rpx;
+  border-radius: 24rpx;
+  font-size: 32rpx; font-weight: 600; color: #2A2626;
+  transition: background 0.15s;
+}
+.sheet-item-hover { background: #F7F5F4; }
+.sheet-emoji {
+  width: 56rpx; height: 56rpx; border-radius: 18rpx;
+  background: #FFF4F0; display: flex; align-items: center; justify-content: center;
+  font-size: 30rpx; flex: none;
+}
+.sheet-item.danger .sheet-label { color: #FF4D3D; }
+.sheet-item.danger .sheet-emoji { background: #FFF0EE; }
+.sheet-divider { height: 1rpx; background: #F0ECEA; margin: 4rpx 24rpx; }
+
+/* 删除确认态 */
+.del-preview {
+  display: flex; align-items: center; gap: 18rpx;
+  background: #FFF7F5; border: 1rpx solid rgba(255, 77, 61, 0.12);
+  border-radius: 20rpx; padding: 22rpx 26rpx;
+  margin: 6rpx 8rpx 26rpx;
+}
+.del-preview-dot { font-size: 30rpx; flex: none; }
+.del-preview-text {
+  flex: 1; min-width: 0;
+  font-size: 28rpx; color: #2A2626; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.del-actions { display: flex; gap: 18rpx; margin: 0 8rpx; }
+.del-btn {
+  flex: 1; border: none; border-radius: 24rpx;
+  height: 96rpx; line-height: 96rpx; font-size: 32rpx; font-weight: 600;
+}
+.del-btn::after { border: none; }
+.del-btn.cancel { background: #F4F2F1; color: #8C8784; }
+.del-btn.go {
+  background: linear-gradient(135deg, #FF4D3D, #FF6F5E);
+  color: #fff; box-shadow: 0 10rpx 24rpx rgba(255, 77, 61, 0.32);
+}
+.del-go-hover { opacity: 0.88; }

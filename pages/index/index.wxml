@@ -67,6 +67,7 @@
           <view class="todo-meta">
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
             <text class="muted">{{item.timeText}}</text>
+            <text wx:if="{{item.remindText}}" class="remind-tag">{{item.remindText}}</text>
           </view>
         </view>
       </view>
@@ -86,16 +87,66 @@
   </view>
 
   <!-- 底部输入栏（仅在有家庭时显示） -->
-  <view wx:if="{{hasFamily}}" class="input-bar">
-    <input
-      class="input-line"
-      placeholder="记一笔家庭待办…"
-      value="{{inputVal}}"
-      bindinput="onInput"
-      confirm-type="done"
-      bindconfirm="onAdd"
-    />
-    <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
+  <view wx:if="{{hasFamily}}" class="input-wrap">
+    <!-- 提醒时间选择条：开启提醒后展开 -->
+    <view wx:if="{{remindOn}}" class="remind-row">
+      <text class="remind-label">🔔 提醒我</text>
+      <picker mode="date" value="{{remindDate}}" start="{{remindDate}}" bindchange="onRemindDateChange">
+        <view class="remind-pick">{{remindDate}}</view>
+      </picker>
+      <text class="remind-sep">·</text>
+      <picker mode="time" value="{{remindTime}}" bindchange="onRemindTimeChange">
+        <view class="remind-pick">{{remindTime}}</view>
+      </picker>
+    </view>
+    <view class="input-bar">
+      <button class="remind-chip {{remindOn ? 'on' : ''}}" bindtap="toggleRemind">🔔</button>
+      <input
+        class="input-line {{editing ? 'editing' : ''}}"
+        placeholder="{{editing ? '修改这条待办…' : '记一笔家庭待办…'}}"
+        value="{{inputVal}}"
+        focus="{{inputFocus}}"
+        confirm-type="done"
+        bindinput="onInput"
+        bindconfirm="onAdd"
+      />
+      <button wx:if="{{editing}}" class="edit-cancel" bindtap="cancelEdit">取消</button>
+      <button class="add-btn {{editing ? 'edit' : ''}} {{inputVal ? '' : 'disable'}}" bindtap="onAdd">{{editing ? '保存' : '添加'}}</button>
+    </view>
+  </view>
+
+  <!-- 长按操作面板：底部弹出的精美菜单 -->
+  <view wx:if="{{menuVisible}}" class="sheet-mask" catchtap="closeMenu" catchtouchmove="noop">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+
+      <!-- 第 1 步：选择操作 -->
+      <block wx:if="{{!confirmDelete}}">
+        <view class="sheet-title">要做什么？</view>
+        <view class="sheet-item" hover-class="sheet-item-hover" bindtap="onMenuEdit">
+          <text class="sheet-emoji">✏️</text>
+          <text class="sheet-label">编辑这条待办</text>
+        </view>
+        <view class="sheet-divider"></view>
+        <view class="sheet-item danger" hover-class="sheet-item-hover" bindtap="onMenuDelete">
+          <text class="sheet-emoji">🗑️</text>
+          <text class="sheet-label">删除</text>
+        </view>
+      </block>
+
+      <!-- 第 2 步：删除确认 -->
+      <block wx:else>
+        <view class="sheet-title">确定要删除吗？</view>
+        <view class="del-preview">
+          <text class="del-preview-dot">🗑️</text>
+          <text class="del-preview-text">{{menuContent}}</text>
+        </view>
+        <view class="del-actions">
+          <button class="del-btn cancel" hover-class="sheet-item-hover" bindtap="closeMenu">再想想</button>
+          <button class="del-btn go" hover-class="del-go-hover" bindtap="confirmRemove">删除</button>
+        </view>
+      </block>
+    </view>
   </view>
 
 </view>

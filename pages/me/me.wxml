@@ -97,6 +97,35 @@
       </view>
     </view>
 
+    <!-- 我的提醒 -->
+    <view class="card">
+      <view class="card-title">
+        <text class="card-title-icon">🔔</text>
+        <text>我的提醒</text>
+        <text wx:if="{{reminders.length}}" class="nick-hint">{{reminders.length}} 条</text>
+      </view>
+      <view wx:if="{{!reminders.length}}" class="muted tip">
+        添加待办时点输入框前的 🔔 即可设置提醒，到点微信会通知你
+      </view>
+      <view wx:else class="reminder-list">
+        <view wx:for="{{reminders}}" wx:key="_id" class="reminder-item">
+          <view class="reminder-main">
+            <view class="reminder-content">{{item.content}}</view>
+            <view class="reminder-meta">
+              <text class="reminder-time">{{item.timeText}}</text>
+              <text class="reminder-remain">{{item.remainingText}}触发</text>
+            </view>
+          </view>
+          <view
+            class="reminder-cancel"
+            data-id="{{item._id}}"
+            data-todoid="{{item.todoId}}"
+            bindtap="onCancelReminder"
+          >取消</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 退出 -->
     <view class="card action-card">
       <button class="leave-btn" bindtap="onLeave">退出家庭</button>

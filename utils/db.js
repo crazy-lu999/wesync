@@ -25,13 +25,15 @@ const updateNickname = (nick) => call('updateNickname', { nick });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
-async function addTodo(familyId, content, openid, creatorNick) {
+async function addTodo(familyId, content, openid, creatorNick, remindAt) {
+  // remindAt：ISO 时间字符串；为空则不设提醒
   await call('todoOps', {
     action: 'add',
     familyId,
     content,
     openid,
     creatorNick: creatorNick || '我',
+    remindAt: remindAt || '',
   });
 }
 
@@ -42,6 +44,14 @@ async function toggleTodo(id, done) {
 async function removeTodo(id) {
   await call('todoOps', { action: 'remove', id });
 }
+
+async function editTodo(id, content) {
+  await call('todoOps', { action: 'edit', id, content });
+}
+
+// 提醒相关
+const getMyReminders = () => call('getMyReminders', {});
+const cancelReminder = (reminderId, todoId) => call('cancelReminder', { reminderId, todoId });
 
 // 服务端读当前家庭待办（绕过脆弱的客户端 read 规则，稳定可靠）
 const getMyTodos = () => call('getMyTodos', {});
@@ -78,7 +88,10 @@ module.exports = {
   updateNickname,
   addTodo,
   toggleTodo,
+  editTodo,
   removeTodo,
   getMyTodos,
+  getMyReminders,
+  cancelReminder,
   subscribeTodos,
 };

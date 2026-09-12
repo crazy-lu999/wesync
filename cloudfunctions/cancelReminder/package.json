@@ -1,0 +1,9 @@
+{
+  "name": "cancelReminder",
+  "version": "1.0.0",
+  "description": "取消一条提醒，并清空对应待办的提醒字段",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
