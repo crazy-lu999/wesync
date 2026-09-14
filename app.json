@@ -3,7 +3,8 @@
     "pages/index/index",
     "pages/create/create",
     "pages/join/join",
-    "pages/me/me"
+    "pages/me/me",
+    "pages/guide/guide"
   ],
   "window": {
     "backgroundTextStyle": "light",

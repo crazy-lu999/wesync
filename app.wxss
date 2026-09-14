@@ -21,7 +21,8 @@ view, text { box-sizing: border-box; }
   font-size: 32rpx;
   font-weight: 600;
   height: 96rpx;
-  line-height: 96rpx;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0;
   background: linear-gradient(135deg, #FF6F5E 0%, #FF917A 100%);
   box-shadow: 0 12rpx 28rpx rgba(255, 111, 94, 0.32);
   border: none;
@@ -43,7 +44,8 @@ view, text { box-sizing: border-box; }
   font-size: 32rpx;
   font-weight: 600;
   height: 96rpx;
-  line-height: 96rpx;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0;
 }
 .btn-ghost::after { border: none; }
 

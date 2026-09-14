@@ -173,6 +173,10 @@ Page({
     });
   },
 
+  goGuide() {
+    wx.navigateTo({ url: '/pages/guide/guide' });
+  },
+
   async doLeave() {
     wx.showLoading({ title: '处理中' });
     try {

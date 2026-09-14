@@ -141,7 +141,8 @@
 .remind-chip {
   flex: none; width: 88rpx; height: 88rpx; border-radius: 50%;
   border: none; padding: 0;
-  background: #F4F2F1; font-size: 38rpx; line-height: 88rpx;
+  background: #F4F2F1; font-size: 38rpx;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
   transition: background 0.2s;
 }
 .remind-chip::after { border: none; }
@@ -171,14 +172,16 @@
 .input-bar .input-line.editing { border-color: rgba(255, 111, 94, 0.4); background: #FFF6F3; }
 .edit-cancel {
   flex: none; border: none; background: #F4F2F1; color: #8C8784;
-  border-radius: 999rpx; height: 76rpx; line-height: 76rpx;
-  padding: 0 32rpx; font-size: 28rpx; font-weight: 500;
+  border-radius: 999rpx; height: 76rpx;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0 32rpx; font-size: 28rpx; font-weight: 500;
 }
 .edit-cancel::after { border: none; }
 .add-btn {
   flex: none; color: #fff; border: none;
-  border-radius: 48rpx; height: 88rpx; line-height: 88rpx;
-  padding: 0 40rpx; font-size: 30rpx; font-weight: 600;
+  border-radius: 48rpx; height: 88rpx;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0 40rpx; font-size: 30rpx; font-weight: 600;
   background: linear-gradient(135deg, #FF6F5E, #FF917A);
   box-shadow: 0 8rpx 20rpx rgba(255, 111, 94, 0.3);
 }
@@ -246,7 +249,10 @@
 .del-actions { display: flex; gap: 18rpx; margin: 0 8rpx; }
 .del-btn {
   flex: 1; border: none; border-radius: 24rpx;
-  height: 96rpx; line-height: 96rpx; font-size: 32rpx; font-weight: 600;
+  height: 96rpx;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; padding: 0;
+  font-size: 32rpx; font-weight: 600;
 }
 .del-btn::after { border: none; }
 .del-btn.cancel { background: #F4F2F1; color: #8C8784; }

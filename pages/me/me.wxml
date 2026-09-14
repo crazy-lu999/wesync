@@ -126,6 +126,18 @@
       </view>
     </view>
 
+    <!-- 使用说明入口 -->
+    <view class="card help-entry" hover-class="help-hover" bindtap="goGuide">
+      <view class="help-left">
+        <text class="card-title-icon">📖</text>
+        <text class="help-label">使用说明</text>
+      </view>
+      <view class="help-right">
+        <text class="muted">教 TA 怎么一起用</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
     <!-- 退出 -->
     <view class="card action-card">
       <button class="leave-btn" bindtap="onLeave">退出家庭</button>

@@ -1,0 +1,46 @@
+/* pages/guide/guide.wxss */
+.page { padding: 32rpx 24rpx 80rpx; }
+
+/* 顶部头图 */
+.hero {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48rpx 0 40rpx;
+}
+.hero-emoji {
+  font-size: 110rpx; margin-bottom: 18rpx;
+  filter: drop-shadow(0 14rpx 22rpx rgba(255, 111, 94, 0.25));
+}
+.hero-title { font-size: 44rpx; font-weight: 800; color: #2A2626; letter-spacing: 1rpx; }
+.hero-sub { font-size: 26rpx; color: #A09B98; margin-top: 12rpx; }
+
+/* 分节卡 */
+.card {
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 34rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 12rpx 40rpx rgba(80, 40, 20, 0.06);
+  border: 1rpx solid rgba(255, 117, 95, 0.06);
+}
+.sec-head { display: flex; align-items: center; gap: 18rpx; margin-bottom: 24rpx; }
+.sec-icon {
+  width: 68rpx; height: 68rpx; border-radius: 20rpx;
+  background: linear-gradient(135deg, #FFF1EC, #FFE4DA);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36rpx;
+}
+.sec-title { font-size: 34rpx; font-weight: 800; color: #2A2626; }
+
+.sec-body { display: flex; flex-direction: column; }
+.sec-row {
+  padding: 18rpx 0;
+  border-top: 1rpx solid #F3EFED;
+}
+.sec-row:first-child { border-top: none; }
+.sec-row-title {
+  font-size: 28rpx; font-weight: 700; color: #3A3533; margin-bottom: 8rpx;
+}
+.sec-row-title::before { content: '· '; color: #FF6F5E; font-weight: 800; }
+.sec-row-desc { font-size: 26rpx; color: #8C8784; line-height: 1.7; }
+
+.foot { text-align: center; padding: 20rpx 0 8rpx; }

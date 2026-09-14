@@ -1,0 +1,26 @@
+<!--pages/guide/guide.wxml-->
+<view class="page">
+
+  <!-- 顶部头图 -->
+  <view class="hero">
+    <view class="hero-emoji">📖</view>
+    <view class="hero-title">使用小本本</view>
+    <view class="hero-sub">和小可爱一起，把日常过成清单</view>
+  </view>
+
+  <!-- 分节说明卡片 -->
+  <view wx:for="{{sections}}" wx:key="title" class="card">
+    <view class="sec-head">
+      <view class="sec-icon">{{item.icon}}</view>
+      <view class="sec-title">{{item.title}}</view>
+    </view>
+    <view class="sec-body">
+      <view wx:for="{{item.items}}" wx:for-item="it" wx:key="t" class="sec-row">
+        <view class="sec-row-title">{{it.t}}</view>
+        <view class="sec-row-desc">{{it.d}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="foot muted">愿每一件小事，都被温柔记下 💛</view>
+</view>
