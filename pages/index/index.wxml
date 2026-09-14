@@ -88,19 +88,7 @@
 
   <!-- 底部输入栏（仅在有家庭时显示） -->
   <view wx:if="{{hasFamily}}" class="input-wrap">
-    <!-- 提醒时间选择条：开启提醒后展开 -->
-    <view wx:if="{{remindOn}}" class="remind-row">
-      <text class="remind-label">🔔 提醒我</text>
-      <picker mode="date" value="{{remindDate}}" start="{{remindDate}}" bindchange="onRemindDateChange">
-        <view class="remind-pick">{{remindDate}}</view>
-      </picker>
-      <text class="remind-sep">·</text>
-      <picker mode="time" value="{{remindTime}}" bindchange="onRemindTimeChange">
-        <view class="remind-pick">{{remindTime}}</view>
-      </picker>
-    </view>
     <view class="input-bar">
-      <button class="remind-chip {{remindOn ? 'on' : ''}}" bindtap="toggleRemind">🔔</button>
       <input
         class="input-line {{editing ? 'editing' : ''}}"
         placeholder="{{editing ? '修改这条待办…' : '记一笔家庭待办…'}}"
@@ -128,6 +116,11 @@
           <text class="sheet-label">编辑这条待办</text>
         </view>
         <view class="sheet-divider"></view>
+        <view class="sheet-item" hover-class="sheet-item-hover" bindtap="onMenuRemind">
+          <text class="sheet-emoji">{{selectedRemindOn ? '🔕' : '🔔'}}</text>
+          <text class="sheet-label">{{selectedRemindOn ? '取消提醒' : '设置提醒'}}</text>
+        </view>
+        <view class="sheet-divider"></view>
         <view class="sheet-item danger" hover-class="sheet-item-hover" bindtap="onMenuDelete">
           <text class="sheet-emoji">🗑️</text>
           <text class="sheet-label">删除</text>
@@ -146,6 +139,35 @@
           <button class="del-btn go" hover-class="del-go-hover" bindtap="confirmRemove">删除</button>
         </view>
       </block>
+    </view>
+  </view>
+
+  <!-- 提醒时间面板（对选定待办设置提醒） -->
+  <view wx:if="{{remindPanel}}" class="sheet-mask" catchtap="closeRemindPanel" catchtouchmove="noop">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">在这条待办上设提醒</view>
+
+      <view class="remind-panel-preview">
+        <text class="remind-preview-dot">🔔</text>
+        <text class="remind-preview-text">{{menuContent || '选个时间，到点微信提醒你'}}</text>
+      </view>
+
+      <view class="remind-panel-row">
+        <picker mode="date" value="{{remindDate}}" bindchange="onRemindDateChange">
+          <view class="remind-pick big">📅 {{remindDate}}</view>
+        </picker>
+        <picker mode="time" value="{{remindTime}}" bindchange="onRemindTimeChange">
+          <view class="remind-pick big">🕘 {{remindTime}}</view>
+        </picker>
+      </view>
+
+      <view class="remind-panel-tip muted">到点后微信「服务通知」会提醒你，点它可回到待办</view>
+
+      <view class="del-actions">
+        <button class="del-btn cancel" hover-class="sheet-item-hover" bindtap="closeRemindPanel">取消</button>
+        <button class="del-btn go" hover-class="del-go-hover" bindtap="confirmRemind">确定提醒</button>
+      </view>
     </view>
   </view>
 

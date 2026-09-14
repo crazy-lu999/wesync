@@ -49,6 +49,11 @@ async function editTodo(id, content) {
   await call('todoOps', { action: 'edit', id, content });
 }
 
+// 设置/取消某条待办的提醒：remindAt 传时间戳则设置，传 '' 则取消
+async function setRemind(id, remindAt) {
+  await call('todoOps', { action: 'setRemind', id, remindAt });
+}
+
 // 提醒相关
 const getMyReminders = () => call('getMyReminders', {});
 const cancelReminder = (reminderId, todoId) => call('cancelReminder', { reminderId, todoId });
@@ -89,6 +94,7 @@ module.exports = {
   addTodo,
   toggleTodo,
   editTodo,
+  setRemind,
   removeTodo,
   getMyTodos,
   getMyReminders,

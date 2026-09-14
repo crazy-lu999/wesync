@@ -1,5 +1,5 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, setRemind, subscribeTodos } = require('../../utils/db.js');
 const { fmtTime, fmtDateTime } = require('../../utils/format.js');
 const { REMIND_TMPL_ID } = require('../../utils/config.js');
 const app = getApp();
@@ -29,10 +29,12 @@ Page({
     editing: false,
     editingId: '',
     inputFocus: false,
-    // 提醒
-    remindOn: false,
+    // 提醒面板（对长按选中的待办设置提醒）
+    remindPanel: false,
+    remindTodoId: '',
     remindDate: '',
     remindTime: '09:00',
+    selectedRemindOn: false, // 当前选中待办是否已有提醒（决定菜单项文案）
   },
 
   onShow() {
@@ -168,20 +170,10 @@ Page({
       await this.saveEdit(content);
       return;
     }
-    // 开了提醒 → 先请求一次订阅授权（一次性）；拒绝则仍添加但不设提醒
-    let remindAt = 0;
-    if (this.data.remindOn) {
-      const t = new Date(`${this.data.remindDate} ${this.data.remindTime}:00`).getTime();
-      if (!isNaN(t)) {
-        const accept = await this.requestSubscribe();
-        if (accept) remindAt = t;
-        else wx.showToast({ title: '未授权，本次不设提醒', icon: 'none' });
-      }
-    }
-    this.setData({ inputVal: '', remindOn: false });
+    this.setData({ inputVal: '' });
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, remindAt || '');
+      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick);
       this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
       wx.hideLoading();
     } catch (e) {
@@ -190,30 +182,101 @@ Page({
     }
   },
 
-  // —— 提醒 ——
+  // —— 提醒（对长按选中的待办设置/取消）——
   _pad(n) { return n < 10 ? '0' + n : '' + n; },
-  toggleRemind() {
-    if (!this.data.remindOn) {
-      const now = new Date();
-      this.setData({
-        remindOn: true,
-        remindDate: `${now.getFullYear()}-${this._pad(now.getMonth() + 1)}-${this._pad(now.getDate())}`,
-      });
-    } else {
-      this.setData({ remindOn: false });
-    }
-  },
-  onRemindDateChange(e) { this.setData({ remindDate: e.detail.value }); },
-  onRemindTimeChange(e) { this.setData({ remindTime: e.detail.value }); },
   // 请求一次性订阅授权，返回用户是否接受
   requestSubscribe() {
     return new Promise((resolve) => {
       wx.requestSubscribeMessage({
         tmplIds: [REMIND_TMPL_ID],
-        success: (res) => resolve(res[REMIND_TMPL_ID] === 'accept'),
-        fail: () => resolve(false),
+        success: (res) => {
+          // 打印完整返回，便于排查模板/授权问题
+          console.log('[subscribe] res=', res);
+          resolve(res[REMIND_TMPL_ID] === 'accept');
+        },
+        fail: (err) => {
+          // 把完整 errMsg 打出来，方便定位（如模板无效、类目不符等）
+          console.error('[subscribe] fail=', err);
+          resolve(false);
+        },
       });
     });
+  },
+  // 菜单项：打开提醒面板（若该待办已设提醒，则回填原时间）
+  openRemindPanel() {
+    const todo = this.data.todos.find((t) => t._id === this.data.menuId);
+    if (!todo) return;
+    let date = '';
+    let time = '09:00';
+    if (todo.remindAt) {
+      const d = new Date(todo.remindAt);
+      if (!isNaN(d.getTime())) {
+        date = `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}-${this._pad(d.getDate())}`;
+        time = `${this._pad(d.getHours())}:${this._pad(d.getMinutes())}`;
+      }
+    }
+    if (!date) {
+      const now = new Date();
+      date = `${now.getFullYear()}-${this._pad(now.getMonth() + 1)}-${this._pad(now.getDate())}`;
+    }
+    this.setData({
+      menuVisible: false,
+      menuId: '',
+      menuContent: todo.content || '', // 供提醒面板预览显示待办内容
+      confirmDelete: false,
+      remindPanel: true,
+      remindTodoId: todo._id,
+      remindDate: date,
+      remindTime: time,
+    });
+  },
+  closeRemindPanel() {
+    this.setData({ remindPanel: false, remindTodoId: '' });
+  },
+  onRemindDateChange(e) { this.setData({ remindDate: e.detail.value }); },
+  onRemindTimeChange(e) { this.setData({ remindTime: e.detail.value }); },
+  // 面板确认：先请求订阅授权，成功才写入提醒
+  async confirmRemind() {
+    const t = new Date(`${this.data.remindDate} ${this.data.remindTime}:00`).getTime();
+    if (isNaN(t)) {
+      wx.showToast({ title: '时间无效', icon: 'none' });
+      return;
+    }
+    const accept = await this.requestSubscribe();
+    if (!accept) {
+      wx.showToast({ title: '未授权订阅消息，无法提醒', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '设置中' });
+    try {
+      await setRemind(this.data.remindTodoId, t);
+      this.closeRemindPanel();
+      this.fetchTodos();
+      wx.hideLoading();
+      wx.showToast({ title: '已设置提醒', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '设置失败', icon: 'none' });
+    }
+  },
+  onMenuRemind() {
+    if (this.data.selectedRemindOn) this.onMenuUnRemind();
+    else this.openRemindPanel();
+  },
+  // 菜单项：取消当前待办的提醒
+  async onMenuUnRemind() {
+    const id = this.data.menuId;
+    this.closeMenu();
+    wx.showLoading({ title: '取消中' });
+    try {
+      await setRemind(id, '');
+      this.fetchTodos();
+      wx.hideLoading();
+      wx.showToast({ title: '已取消提醒', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '取消失败', icon: 'none' });
+    }
   },
 
 
@@ -245,7 +308,12 @@ Page({
   onLongPress(e) {
     const { id } = e.currentTarget.dataset;
     const todo = this.data.todos.find((t) => t._id === id);
-    this.setData({ menuId: id, menuContent: todo ? todo.content : '', menuVisible: true });
+    this.setData({
+      menuId: id,
+      menuContent: todo ? todo.content : '',
+      menuVisible: true,
+      selectedRemindOn: !!(todo && todo.remindAt),
+    });
   },
 
   // —— 底部操作面板 ——

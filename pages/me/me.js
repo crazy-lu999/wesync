@@ -130,6 +130,10 @@ Page({
     });
   },
 
+  onMemberTap(e) {
+    if (e.currentTarget.dataset.me) this.onEditNick();
+  },
+
   onEditNick() {
     this.setData({ nickInput: this.data.myNick || '', editingNick: true });
   },

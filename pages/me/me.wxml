@@ -27,41 +27,8 @@
       </view>
     </view>
 
-    <!-- 我的昵称 -->
-    <view class="card">
-      <view class="card-title">
-        <text class="card-title-icon">🏷️</text>
-        <text>我的昵称</text>
-        <text class="nick-hint">轻点可改</text>
-      </view>
-      <!-- 展示态：轻点昵称即可编辑 -->
-      <view wx:if="{{!editingNick}}" class="nick-row" hover-class="nick-row-hover" bindtap="onEditNick">
-        <view class="nick-view">
-          <view class="avatar mine nick-avatar">{{myNick[0]}}</view>
-          <view class="nick-name">{{myNick}}</view>
-        </view>
-        <view class="nick-edit">✏️</view>
-      </view>
-      <!-- 编辑态 -->
-      <view wx:else class="nick-row">
-        <input
-          class="nick-input"
-          value="{{nickInput}}"
-          focus
-          maxlength="20"
-          bindinput="onNickInput"
-          bindconfirm="onSaveNick"
-          placeholder="输入新昵称"
-        />
-        <view class="nick-actions">
-          <view class="copy-btn" bindtap="onCancelNick">取消</view>
-          <view class="save-btn" bindtap="onSaveNick">保存</view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 邀请码卡 -->
-    <view class="card invite-card">
+    <!-- 邀请码卡：家庭两名成员齐了就不再显示，无意义 -->
+    <view wx:if="{{members.length < 2}}" class="card invite-card">
       <view class="card-title">
         <text class="card-title-icon">✉️</text>
         <text>邀请另一半</text>
@@ -83,16 +50,43 @@
       <view class="card-title">
         <text class="card-title-icon">👥</text>
         <text>家庭成员（{{members.length}}/2）</text>
+        <text wx:if="{{!editingNick}}" class="nick-hint">点自己可改名</text>
       </view>
       <view class="members">
-        <view wx:for="{{members}}" wx:key="openid" class="member">
+        <view
+          wx:for="{{members}}"
+          wx:key="openid"
+          class="member {{item.me ? 'me-row' : ''}}"
+          data-me="{{item.me}}"
+          bindtap="onMemberTap"
+          hover-class="member-hover"
+        >
           <view class="avatar {{item.me ? 'mine' : ''}}">{{item.nick ? item.nick[0] : '我'}}</view>
           <view class="m-name">{{item.nick}}</view>
-          <view wx:if="{{item.me}}" class="me-tag">我</view>
+          <view class="member-meta">
+            <view wx:if="{{item.me}}" class="me-tag">我</view>
+            <view wx:if="{{item.me && !editingNick}}" class="me-edit-chip">✏️</view>
+          </view>
         </view>
-        <view wx:if="{{members.length < 2}}" class="member empty-slot">
+        <view wx:if="{{members.length < 2 && !editingNick}}" class="member empty-slot">
           <view class="avatar ghost">+</view>
           <view class="m-name muted">等待另一半加入…</view>
+        </view>
+      </view>
+      <!-- 点击自己后在成员卡内展开编辑 -->
+      <view wx:if="{{editingNick}}" class="member-edit-row">
+        <input
+          class="nick-input"
+          value="{{nickInput}}"
+          focus
+          maxlength="20"
+          bindinput="onNickInput"
+          bindconfirm="onSaveNick"
+          placeholder="输入新昵称"
+        />
+        <view class="nick-actions">
+          <view class="copy-btn" bindtap="onCancelNick">取消</view>
+          <view class="save-btn" bindtap="onSaveNick">保存</view>
         </view>
       </view>
     </view>
@@ -105,7 +99,7 @@
         <text wx:if="{{reminders.length}}" class="nick-hint">{{reminders.length}} 条</text>
       </view>
       <view wx:if="{{!reminders.length}}" class="muted tip">
-        添加待办时点输入框前的 🔔 即可设置提醒，到点微信会通知你
+        长按某条待办选「设置提醒」，允许微信订阅，到点微信会通知你
       </view>
       <view wx:else class="reminder-list">
         <view wx:for="{{reminders}}" wx:key="_id" class="reminder-item">
