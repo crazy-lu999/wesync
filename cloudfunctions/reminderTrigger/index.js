@@ -21,7 +21,8 @@ function fmtDT(input) {
 }
 
 exports.main = async () => {
-  const now = new Date();
+  // 用数据库服务器时钟做边界比较，避免依赖云函数容器本地时钟
+  const now = db.serverDate();
   let sent = 0, skipped = 0, failed = 0;
   try {
     const res = await db.collection('reminders')

@@ -69,12 +69,12 @@ exports.main = async (event) => {
       } catch (e) { /* ignore */ }
       if (remindAt) {
         // 设置：写待办 remindAt，并新增一条提醒（同一待办先清旧的未触发提醒再写，避免重复）
+        // 存「绝对时刻」(JS Date / epoch 毫秒)，不依赖服务器时钟，前端展示即用户所选的时间
         try {
           await db.collection('reminders').where({ todoId: id, triggered: false }).remove();
         } catch (e) { /* ignore */ }
         await db.collection('todos').doc(id).update({
-          // offset 必须为整数秒，浮点会报 INVALID_PARAM(501007)
-          data: { remindAt: db.serverDate({ offset: Math.round((remindAt.getTime() - Date.now()) / 1000) }) },
+          data: { remindAt: new Date(remindAt.getTime()) },
         });
         try {
           await db.collection('reminders').add({
@@ -82,7 +82,7 @@ exports.main = async (event) => {
               openid: OPENID,
               todoId: id,
               content: content || '你有一条待办',
-              remindAt: db.serverDate({ offset: Math.round((remindAt.getTime() - Date.now()) / 1000) }),
+              remindAt: new Date(remindAt.getTime()),
               triggered: false,
               createTime: db.serverDate(),
             },
