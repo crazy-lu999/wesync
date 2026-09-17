@@ -1,7 +1,7 @@
 {
-  "name": "getMyReminders",
+  "name": "submitFeedback",
   "version": "1.0.0",
-  "description": "查询当前用户未触发的提醒",
+  "description": "提交用户使用反馈",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

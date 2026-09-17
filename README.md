@@ -34,6 +34,7 @@ shared-todo/
     ├── getMyReminders/               # 查询当前用户未触发的提醒
     ├── cancelReminder/               # 取消一条提醒，并清空对应待办提醒字段
     └── reminderTrigger/              # 定时触发器：扫描到期提醒，下发订阅消息（每分钟）
+    └── submitFeedback/               # 提交用户使用反馈（服务端写，openid 取云端、带限频防刷）
 ```
 
 ## 首次使用配置（5 步）
@@ -45,11 +46,13 @@ shared-todo/
 - 把 AppID 填到 `project.config.json` 的 `"appid"`。
 
 ### 2. 建数据库集合 + 配实时推送
-云开发控制台 → 数据库 → 新建三个集合：`families`、`todos`、`reminders`。
+云开发控制台 → 数据库 → 新建四个集合：`families`、`todos`、`reminders`、`feedbacks`。
 
 **`families` 集合**：保持默认权限即可（读写全走云函数）。
 
 **`reminders` 集合**：保持默认权限即可（读写全走云函数 / 定时触发器）。
+
+**`feedbacks` 集合**：保存「我的」页提交的意见反馈。保持默认权限即可，数据一律经 `submitFeedback` 云函数写入。
 
 **`todos` 集合**需要两步，让「实时同步」生效：
 
@@ -80,8 +83,8 @@ shared-todo/
 
 ### 3. 部署云函数
 在开发者工具左侧 `cloudfunctions` 目录下，**右键每个云函数文件夹** →
-「上传并部署：云端安装依赖（不上传 node_modules）」。共 10 个：
-`createFamily`、`joinFamily`、`getMyFamily`、`leaveFamily`、`updateNickname`、`todoOps`、`getMyTodos`、`getMyReminders`、`cancelReminder`、`reminderTrigger`。
+「上传并部署：云端安装依赖（不上传 node_modules）」。共 11 个：
+`createFamily`、`joinFamily`、`getMyFamily`、`leaveFamily`、`updateNickname`、`todoOps`、`getMyTodos`、`getMyReminders`、`cancelReminder`、`reminderTrigger`、`submitFeedback`。
 
 > `reminderTrigger` 首次部署时务必勾选**「同时上传云函数触发器」**（`config.json` 里配了每分钟 timer）。否则定时扫描不会启动。
 
@@ -102,6 +105,7 @@ shared-todo/
 5. 修改待办内容：**长按**待办 → 底部菜单选「编辑」→ 输入框进入编辑态改内容 →「保存」。
 6. 设置提醒：**长按**某条待办 → 底部菜单选「设置提醒」→ 选日期/时间 →「确定提醒」并确认订阅授权。到点微信「服务通知」会收到提醒，点它跳回待办页；已设提醒的待办长按菜单会变「取消提醒」。
 7. 查看/取消提醒：进「我的」页 → 「我的提醒」卡片列出自建的所有未触发提醒（含触发时间与倒计时），点「取消」即可。
+8. 反馈与版本：进「我的」页 → 「意见反馈」→ 写下你的想法 →「提交」；页底与「使用说明」页会显示当前**版本号**（发版前同步改 `utils/config.js` 的 `APP_VERSION`）。
 
 ## 验证清单
 
@@ -117,6 +121,8 @@ shared-todo/
 - [ ] 第三个号加入提示「家庭已满员」
 - [ ] 退出家庭后回引导页，对方仍正常
 - [ ] 在「我的」页改自己的昵称，保存后本页与对方看到同步更新
+- [ ] 「我的」页 →「意见反馈」→ 输入内容 →「提交」→ 提示「感谢反馈」
+- [ ] 「我的」页底与「使用说明」页能看到版本号
 
 ## 技术要点
 
@@ -126,6 +132,7 @@ shared-todo/
 - **提醒闭环**：添加带 `remindAt` 的待办时，`todoOps` 同时写 `reminders` 集合并存 `openid`；`reminderTrigger`（每分钟 timer）扫描到期项，调用 `cloud.openapi.subscribeMessage.send` 下发订阅消息，成功即标记 `triggered`，授权用尽(43101)则标记跳过防轰炸；删除/取消会同步清理提醒。提醒只发给创建者本人。
 - **首屏秒显**：待办列表缓存到本地 `wx.setStorageSync`，再次进入页面时先用缓存立即渲染，再后台拉服务端覆盖；且首次拉到数据前不显示「还没有待办」的空态（避免冷启动时的假空白）。退出家庭时同步清缓存。
 - **openid 信任**：创建/加入/查询/退出/待办写全走云函数，openid 来自 `wx.getWXContext()`，客户端无法伪造。
+- **反馈闭环**：「意见反馈」同样走 `submitFeedback` 云函数，openid 取云端并附带 30 秒限频，`feedbacks` 集合保持默认权限即可，规避客户端直写规则的脆弱配置。
 - **读写分离**：待办**写**（`todoOps`）和家庭读写全走云函数（服务端），客户端只对 `todos` 做受规则约束的**读**（`auth.openid in doc.members`），不依赖脆弱的客户端写规则。
 - **members 一致性**：`joinFamily`/`leaveFamily` 会同步新旧成员的 `todos.members`，避免新成员读不到旧待办、或已退出者仍能读到。
 - **邀请码唯一性**：生成后查 `count()`，重复则重生成，最多重试 20 次。

@@ -22,18 +22,17 @@ const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNi
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
 const updateNickname = (nick) => call('updateNickname', { nick });
+const submitFeedback = (content) => call('submitFeedback', { content });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
-async function addTodo(familyId, content, openid, creatorNick, remindAt) {
-  // remindAt：ISO 时间字符串；为空则不设提醒
+async function addTodo(familyId, content, openid, creatorNick) {
   await call('todoOps', {
     action: 'add',
     familyId,
     content,
     openid,
     creatorNick: creatorNick || '我',
-    remindAt: remindAt || '',
   });
 }
 
@@ -48,15 +47,6 @@ async function removeTodo(id) {
 async function editTodo(id, content) {
   await call('todoOps', { action: 'edit', id, content });
 }
-
-// 设置/取消某条待办的提醒：remindAt 传时间戳则设置，传 '' 则取消
-async function setRemind(id, remindAt) {
-  await call('todoOps', { action: 'setRemind', id, remindAt });
-}
-
-// 提醒相关
-const getMyReminders = () => call('getMyReminders', {});
-const cancelReminder = (reminderId, todoId) => call('cancelReminder', { reminderId, todoId });
 
 // 服务端读当前家庭待办（绕过脆弱的客户端 read 规则，稳定可靠）
 const getMyTodos = () => call('getMyTodos', {});
@@ -91,13 +81,11 @@ module.exports = {
   getMyFamily,
   leaveFamily,
   updateNickname,
+  submitFeedback,
   addTodo,
   toggleTodo,
   editTodo,
-  setRemind,
   removeTodo,
   getMyTodos,
-  getMyReminders,
-  cancelReminder,
   subscribeTodos,
 };

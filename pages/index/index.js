@@ -1,7 +1,6 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, setRemind, subscribeTodos } = require('../../utils/db.js');
-const { fmtTime, fmtDateTime } = require('../../utils/format.js');
-const { REMIND_TMPL_ID } = require('../../utils/config.js');
+const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
+const { fmtTime } = require('../../utils/format.js');
 const app = getApp();
 
 Page({
@@ -20,21 +19,10 @@ Page({
     todosReady: false, // 首次从服务端拉到待办后才置 true（用于区分真假空态）
     activeCount: 0,
     doneCount: 0,
-    // 长按操作面板
-    menuVisible: false,
-    menuId: '', // 当前长按选中的待办 id
-    menuContent: '', // 待办摘要，用于删除确认预览
-    confirmDelete: false, // 面板切到删除确认态
     // 编辑态
     editing: false,
     editingId: '',
     inputFocus: false,
-    // 提醒面板（对长按选中的待办设置提醒）
-    remindPanel: false,
-    remindTodoId: '',
-    remindDate: '',
-    remindTime: '09:00',
-    selectedRemindOn: false, // 当前选中待办是否已有提醒（决定菜单项文案）
   },
 
   onShow() {
@@ -145,7 +133,6 @@ Page({
     const mapped = todos.map((t) => ({
       ...t,
       timeText: fmtTime(t.createTime),
-      remindText: t.remindAt ? ('🔔 ' + fmtDateTime(t.remindAt)) : '',
       mine: t.creatorOpenid === this.data.myOpenid,
     }));
     // 未完成在前，同类按创建时间倒序
@@ -182,104 +169,6 @@ Page({
     }
   },
 
-  // —— 提醒（对长按选中的待办设置/取消）——
-  _pad(n) { return n < 10 ? '0' + n : '' + n; },
-  // 请求一次性订阅授权，返回用户是否接受
-  requestSubscribe() {
-    return new Promise((resolve) => {
-      wx.requestSubscribeMessage({
-        tmplIds: [REMIND_TMPL_ID],
-        success: (res) => {
-          // 打印完整返回，便于排查模板/授权问题
-          console.log('[subscribe] res=', res);
-          resolve(res[REMIND_TMPL_ID] === 'accept');
-        },
-        fail: (err) => {
-          // 把完整 errMsg 打出来，方便定位（如模板无效、类目不符等）
-          console.error('[subscribe] fail=', err);
-          resolve(false);
-        },
-      });
-    });
-  },
-  // 菜单项：打开提醒面板（若该待办已设提醒，则回填原时间）
-  openRemindPanel() {
-    const todo = this.data.todos.find((t) => t._id === this.data.menuId);
-    if (!todo) return;
-    let date = '';
-    let time = '09:00';
-    if (todo.remindAt) {
-      const d = new Date(todo.remindAt);
-      if (!isNaN(d.getTime())) {
-        date = `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}-${this._pad(d.getDate())}`;
-        time = `${this._pad(d.getHours())}:${this._pad(d.getMinutes())}`;
-      }
-    }
-    if (!date) {
-      const now = new Date();
-      date = `${now.getFullYear()}-${this._pad(now.getMonth() + 1)}-${this._pad(now.getDate())}`;
-    }
-    this.setData({
-      menuVisible: false,
-      menuId: '',
-      menuContent: todo.content || '', // 供提醒面板预览显示待办内容
-      confirmDelete: false,
-      remindPanel: true,
-      remindTodoId: todo._id,
-      remindDate: date,
-      remindTime: time,
-    });
-  },
-  closeRemindPanel() {
-    this.setData({ remindPanel: false, remindTodoId: '' });
-  },
-  onRemindDateChange(e) { this.setData({ remindDate: e.detail.value }); },
-  onRemindTimeChange(e) { this.setData({ remindTime: e.detail.value }); },
-  // 面板确认：先请求订阅授权，成功才写入提醒
-  async confirmRemind() {
-    const t = new Date(`${this.data.remindDate} ${this.data.remindTime}:00`).getTime();
-    if (isNaN(t)) {
-      wx.showToast({ title: '时间无效', icon: 'none' });
-      return;
-    }
-    const accept = await this.requestSubscribe();
-    if (!accept) {
-      wx.showToast({ title: '未授权订阅消息，无法提醒', icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '设置中' });
-    try {
-      await setRemind(this.data.remindTodoId, t);
-      this.closeRemindPanel();
-      this.fetchTodos();
-      wx.hideLoading();
-      wx.showToast({ title: '已设置提醒', icon: 'success' });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '设置失败', icon: 'none' });
-    }
-  },
-  onMenuRemind() {
-    if (this.data.selectedRemindOn) this.onMenuUnRemind();
-    else this.openRemindPanel();
-  },
-  // 菜单项：取消当前待办的提醒
-  async onMenuUnRemind() {
-    const id = this.data.menuId;
-    this.closeMenu();
-    wx.showLoading({ title: '取消中' });
-    try {
-      await setRemind(id, '');
-      this.fetchTodos();
-      wx.hideLoading();
-      wx.showToast({ title: '已取消提醒', icon: 'success' });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '取消失败', icon: 'none' });
-    }
-  },
-
-
   async onToggle(e) {
     const { id, index } = e.currentTarget.dataset;
     const todo = this.data.todos[index];
@@ -305,55 +194,47 @@ Page({
     this.setData({ todos, doneCount, activeCount: todos.length - doneCount });
   },
 
-  onLongPress(e) {
-    const { id } = e.currentTarget.dataset;
-    const todo = this.data.todos.find((t) => t._id === id);
+  // 行内按钮：编辑（直接进入编辑态，输入框回填已有内容再聚焦）
+  onEnterEdit(e) {
+    const { index } = e.currentTarget.dataset;
+    const todo = this.data.todos[index];
+    if (!todo) return;
+    // 先把 value 写进 input，再 nextTick 聚焦，避免微信 input 的 value 与
+    // focus 同帧 setData 时 value 被吞，导致看不到已有内容/像是在“追加”。
     this.setData({
-      menuId: id,
-      menuContent: todo ? todo.content : '',
-      menuVisible: true,
-      selectedRemindOn: !!(todo && todo.remindAt),
-    });
-  },
-
-  // —— 底部操作面板 ——
-  closeMenu() {
-    this.setData({ menuVisible: false, menuId: '', menuContent: '', confirmDelete: false });
-  },
-
-  noop() {},
-
-  // 菜单：编辑
-  onMenuEdit() {
-    const todo = this.data.todos.find((t) => t._id === this.data.menuId);
-    this.setData({
-      menuVisible: false,
-      confirmDelete: false,
       editing: true,
-      editingId: this.data.menuId,
-      inputVal: todo ? todo.content : '',
-      inputFocus: true,
+      editingId: todo._id,
+      inputVal: todo.content || '',
+      inputFocus: false,
     });
+    const that = this;
+    wx.nextTick(() => that.setData({ inputFocus: true }));
   },
 
-  // 菜单：删除 → 面板内二段式确认
-  onMenuDelete() {
-    this.setData({ confirmDelete: true });
-  },
-
-  // 确认删除：真正执行
-  async confirmRemove() {
-    const id = this.data.menuId;
-    this.closeMenu();
-    wx.showLoading({ title: '删除中' });
-    try {
-      await removeTodo(id);
-      this.fetchTodos(); // 立刻刷新，删除零延迟生效
-      wx.hideLoading();
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '删除失败', icon: 'none' });
-    }
+  // 行内按钮：删除（用 wx 原生确认弹框）
+  onDeleteTodo(e) {
+    const { index } = e.currentTarget.dataset;
+    const todo = this.data.todos[index];
+    if (!todo) return;
+    wx.showModal({
+      title: '删除待办',
+      content: `确定删除「${todo.content}」吗？删除后不可恢复。`,
+      confirmText: '删除',
+      confirmColor: '#FF4D3D',
+      cancelText: '再想想',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '删除中' });
+        try {
+          await removeTodo(todo._id);
+          this.fetchTodos(); // 立刻刷新，删除零延迟生效
+          wx.hideLoading();
+        } catch (e) {
+          wx.hideLoading();
+          wx.showToast({ title: e.message || '删除失败', icon: 'none' });
+        }
+      },
+    });
   },
 
 
@@ -372,18 +253,6 @@ Page({
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: e.message || '保存失败', icon: 'none' });
-    }
-  },
-
-  async doRemove(id) {
-    wx.showLoading({ title: '删除中' });
-    try {
-      await removeTodo(id);
-      this.fetchTodos(); // 立刻刷新，删除零延迟生效
-      wx.hideLoading();
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '删除失败', icon: 'none' });
     }
   },
 

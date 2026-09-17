@@ -23,11 +23,4 @@ function fmtTime(input) {
   return sameDay ? hm : `${md} ${hm}`;
 }
 
-// 提醒用的完整时间：始终显示 "MM-DD HH:mm"，不省略日期，避免跨天提醒闹误会
-function fmtDateTime(input) {
-  const d = toDate(input);
-  if (!d) return '';
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-module.exports = { fmtTime, fmtDateTime };
+module.exports = { fmtTime };

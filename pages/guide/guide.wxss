@@ -44,3 +44,4 @@
 .sec-row-desc { font-size: 26rpx; color: #8C8784; line-height: 1.7; }
 
 .foot { text-align: center; padding: 20rpx 0 8rpx; }
+.ver { text-align: center; padding-bottom: 20rpx; font-size: 22rpx; }

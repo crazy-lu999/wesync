@@ -23,4 +23,5 @@
   </view>
 
   <view class="foot muted">愿每一件小事，都被温柔记下 💛</view>
+  <view class="ver muted">我们的小本本 · 版本 {{version}}</view>
 </view>
