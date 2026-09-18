@@ -18,12 +18,67 @@
   </block>
 
   <block wx:elif="{{family}}">
-    <!-- 家庭信息卡（名牌风） -->
-    <view class="profile card">
-      <view class="profile-icon">🏠</view>
-      <view class="profile-info">
-        <view class="profile-name">{{family.name}}</view>
-        <view class="profile-sub">我们的小本本</view>
+    <!-- 相片墙卡：自定义上传照片展示（长按删除 / 点按查看） -->
+    <view class="card">
+      <view class="card-title">
+        <text class="card-title-icon">📷</text>
+        <block wx:if="{{editingWallTitle}}">
+          <input
+            class="wall-title-input"
+            value="{{wallTitleInput}}"
+            focus
+            maxlength="12"
+            bindinput="onWallTitleInput"
+            bindconfirm="onSaveWallTitle"
+            placeholder="给相片墙起个名"
+          />
+          <view class="wall-title-actions">
+            <text class="muted wall-cancel" bindtap="onCancelWallTitle">取消</text>
+            <text class="save-btn" bindtap="onSaveWallTitle">保存</text>
+          </view>
+        </block>
+        <block wx:else>
+          <view class="wall-title-tap" bindtap="onEditWallTitle" hover-class="cell-hover">
+            <text>{{photoWallTitle}}</text>
+            <text class="wall-edit-chip" hover-class="cell-hover">✎</text>
+          </view>
+        </block>
+        <text wx:if="{{photos.length}}" class="muted photo-count">{{photos.length}}/{{photoMax}}</text>
+      </view>
+
+      <!-- 封面：设了封面后顶部整幅展示 -->
+      <view wx:if="{{cover}}" class="cover-wrap">
+        <image class="cover-img" src="{{cover}}" mode="aspectFill" bindtap="onPreviewPhoto" data-url="{{cover}}" data-index="{{coverIndex}}"/>
+        <view class="cover-tag">🌟 封面</view>
+      </view>
+
+      <!-- 空态：居中大占位，点击上传第一张 -->
+      <view wx:if="{{!photos.length}}" class="photo-empty" bindtap="onPickPhotos" hover-class="cell-hover">
+        <view class="empty-emoji">📸</view>
+        <view class="empty-tip">上传第一张，定格我们的美好时光</view>
+      </view>
+
+      <!-- 有照片：网格展示 -->
+      <view wx:elif="{{photos.length}}" class="photo-grid">
+        <view
+          class="photo-cell {{item === cover ? 'covered' : ''}}"
+          wx:for="{{photos}}"
+          wx:key="*this"
+          data-url="{{item}}"
+          data-index="{{index}}"
+          bindtap="onPreviewPhoto"
+          bindlongpress="onPhotoMenu"
+          hover-class="cell-hover"
+        >
+          <image class="photo-img" src="{{item}}" mode="aspectFill" lazy-load/>
+          <view wx:if="{{item === cover}}" class="cell-cover-mark">封面</view>
+        </view>
+      </view>
+
+      <!-- 有照片时：底部美观的添加入口 -->
+      <view wx:if="{{photos.length && photos.length < photoMax}}" class="photo-add-btn" bindtap="onPickPhotos" hover-class="cell-hover">
+        <text class="add-btn-plus">＋</text>
+        <text class="add-btn-text">添加照片</text>
       </view>
     </view>
 

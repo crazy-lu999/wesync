@@ -1,0 +1,9 @@
+{
+  "name": "updateFamily",
+  "version": "1.0.0",
+  "description": "家庭照片墙与家庭名修改（增删照片 / 重命名）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

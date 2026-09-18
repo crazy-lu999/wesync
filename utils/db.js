@@ -23,6 +23,12 @@ const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
 const updateNickname = (nick) => call('updateNickname', { nick });
 const submitFeedback = (content) => call('submitFeedback', { content });
+// 家庭照片墙 / 家庭名修改（服务端写）
+const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos', fileIDs });
+const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
+const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
+const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
+const setCover = (fileID) => call('updateFamily', { action: 'setCover', fileID });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
@@ -82,6 +88,11 @@ module.exports = {
   leaveFamily,
   updateNickname,
   submitFeedback,
+  addFamilyPhotos,
+  removeFamilyPhoto,
+  renameFamily,
+  setWallTitle,
+  setCover,
   addTodo,
   toggleTodo,
   editTodo,

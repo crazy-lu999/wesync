@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover } = require('../../utils/db.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -12,7 +12,19 @@ function buildView(family, openid) {
     nick: memberNicks[o] || '成员',
     me: o === openid,
   }));
-  return { family: family || null, myOpenid: openid || '', myNick, members };
+  const photos = (family && family.photos) || [];
+  const cover = (family && family.cover) || '';
+  return {
+    family: family || null,
+    myOpenid: openid || '',
+    myNick,
+    members,
+    photos,
+    cover,
+    coverIndex: cover ? photos.indexOf(cover) : -1,
+    photoWallTitle: ((family && family.wallTitle) || '').trim() || config.PHOTO_WALL_TITLE,
+    photoMax: 9,
+  };
 }
 
 Page({
@@ -20,7 +32,14 @@ Page({
     family: null,
     myOpenid: '',
     myNick: '我',
-    members: [], // [{ openid, nick, me }]
+    members: [],
+    photos: [], // 云存储 fileID 列表
+    cover: '', // 封面 fileID
+    coverIndex: -1,
+    photoMax: 9,
+    photoWallTitle: config.PHOTO_WALL_TITLE,
+    editingWallTitle: false,
+    wallTitleInput: '',
     loading: true,
     editingNick: false,
     nickInput: '',
@@ -161,6 +180,140 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: e.message || '提交失败', icon: 'none' });
     }
+  },
+
+  // —— 相片墙 ——
+
+  // 点击标题直接改为可编辑态
+  onEditWallTitle() {
+    this.setData({ wallTitleInput: this.data.photoWallTitle, editingWallTitle: true });
+  },
+  onCancelWallTitle() {
+    this.setData({ editingWallTitle: false, wallTitleInput: '' });
+  },
+  onWallTitleInput(e) {
+    this.setData({ wallTitleInput: e.detail.value });
+  },
+  async onSaveWallTitle() {
+    const t = (this.data.wallTitleInput || '').trim().slice(0, 12);
+    if (!t) {
+      wx.showToast({ title: '标题不能为空', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中' });
+    try {
+      await setWallTitle(t);
+      const fresh = await getMyFamily();
+      app.globalData.family = fresh.family;
+      wx.setStorageSync('myFamily', fresh.family);
+      this.setData({
+        ...buildView(fresh.family, fresh.openid),
+        editingWallTitle: false,
+        wallTitleInput: '',
+      });
+      wx.hideLoading();
+      wx.showToast({ title: '已保存', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
+  },
+
+  onPickPhotos() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sizeType: ['compressed'],
+      success: async (res) => {
+        if (!res.tempFiles.length) return;
+        const f = res.tempFiles[0];
+        const filePath = f.tempFilePath;
+        const ext = (filePath.match(/\.[a-zA-Z0-9]+$/) || ['.jpg'])[0];
+        const cloudPath = `photos/${this.data.myOpenid}/${Date.now()}${ext}`;
+        wx.showLoading({ title: '上传中' });
+        try {
+          const up = await wx.cloud.uploadFile({ cloudPath, filePath });
+          await addFamilyPhotos([up.fileID]);
+          // 刷新照片墙（家庭对象含最新 photos）
+          const fresh = await getMyFamily();
+          app.globalData.family = fresh.family;
+          wx.setStorageSync('myFamily', fresh.family);
+          this.setData(buildView(fresh.family, fresh.openid));
+          wx.hideLoading();
+          wx.showToast({ title: '已上传', icon: 'success' });
+        } catch (e) {
+          wx.hideLoading();
+          wx.showToast({ title: e.message || '上传失败', icon: 'none' });
+        }
+      },
+    });
+  },
+
+  onPreviewPhoto(e) {
+    const urls = this.data.photos;
+    wx.previewImage({
+      current: e.currentTarget.dataset.url,
+      urls,
+    });
+  },
+
+  // 长按照片弹二级菜单：设封面 / 删除
+  onPhotoMenu(e) {
+    const idx = e.currentTarget.dataset.index;
+    const url = this.data.photos[idx];
+    if (!url) return;
+    const isCover = url === this.data.cover;
+    const items = [isCover ? '🌙 取消封面' : '🌟 设为封面', '🗑️ 删除照片'];
+    wx.showActionSheet({
+      itemList: items,
+      success: (res) => {
+        if (res.tapIndex === 0) this.setCoverPhoto(!isCover ? url : '', !isCover);
+        else if (res.tapIndex === 1) this.confirmDeletePhoto(idx);
+      },
+    });
+  },
+
+  async setCoverPhoto(fileID, becomingCover) {
+    wx.showLoading({ title: '设置中' });
+    try {
+      await setCover(fileID);
+      const fresh = await getMyFamily();
+      app.globalData.family = fresh.family;
+      wx.setStorageSync('myFamily', fresh.family);
+      this.setData(buildView(fresh.family, fresh.openid));
+      wx.hideLoading();
+      wx.showToast({ title: becomingCover ? '已设为封面' : '已取消封面', icon: 'none' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '操作失败', icon: 'none' });
+    }
+  },
+
+  confirmDeletePhoto(idx) {
+    const fileID = this.data.photos[idx];
+    if (!fileID) return;
+    const url = fileID;
+    wx.showModal({
+      title: '删除这张照片？',
+      content: '相片墙和对方那边都会移除。',
+      confirmColor: '#F0413B',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '删除中' });
+        try {
+          await removeFamilyPhoto(url);
+          const fresh = await getMyFamily();
+          app.globalData.family = fresh.family;
+          wx.setStorageSync('myFamily', fresh.family);
+          this.setData(buildView(fresh.family, fresh.openid));
+          wx.hideLoading();
+          wx.showToast({ title: '已删除', icon: 'none' });
+        } catch (err) {
+          wx.hideLoading();
+          wx.showToast({ title: err.message || '删除失败', icon: 'none' });
+        }
+      },
+    });
   },
 
   async doLeave() {

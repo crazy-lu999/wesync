@@ -4,4 +4,6 @@ module.exports = {
   APP_VERSION: '1.3.0',
   // 意见反馈：单条字数上限（需与 cloudfunctions/submitFeedback/index.js 的 MAX_LEN 一致）
   FEEDBACK_MAX_LEN: 500,
+  // 相片墙卡片标题（可自定义成你们喜欢的名字）
+  PHOTO_WALL_TITLE: '美好时光',
 };

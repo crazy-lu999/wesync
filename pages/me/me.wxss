@@ -1,6 +1,97 @@
 /* pages/me/me.wxss */
 .page { padding-top: 40rpx; }
 
+/* 相片墙标题：点击可改名 */
+.wall-title-tap {
+  display: flex; align-items: center; gap: 10rpx;
+  padding-right: 8rpx; cursor: pointer;
+}
+.wall-edit-chip {
+  font-size: 22rpx; color: #FF9A86;
+  background: #FFF1EC; border-radius: 999rpx;
+  padding: 4rpx 12rpx; margin-left: 4rpx;
+}
+.wall-title-input {
+  flex: 1; min-width: 120rpx; height: 56rpx; line-height: 56rpx;
+  padding: 0 18rpx; margin-right: 12rpx;
+  background: #F7F5F4; border: 2rpx solid #FFD7CE; border-radius: 12rpx;
+  font-size: 28rpx; font-weight: 600; color: #2A2626;
+}
+.wall-title-actions {
+  margin-left: auto; display: flex; align-items: center; gap: 16rpx;
+}
+.wall-cancel {
+  font-size: 24rpx; font-weight: 600;
+  padding: 8rpx 6rpx; cursor: pointer;
+}
+
+/* 相片墙 */
+.photo-count { margin-left: auto; font-size: 22rpx; font-weight: 400; }
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+.photo-cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #F4F2F1;
+}
+.photo-img {
+  width: 100%; height: 100%; display: block;
+}
+.cell-hover { opacity: 0.78; }
+
+/* 封面 */
+.cover-wrap {
+  position: relative; width: 100%; height: 300rpx;
+  border-radius: 20rpx; overflow: hidden; margin-bottom: 16rpx;
+}
+.cover-img { width: 100%; height: 100%; display: block; }
+.cover-tag {
+  position: absolute; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 22rpx;
+  padding: 8rpx 22rpx; border-radius: 20rpx 0 20rpx 0;
+}
+.photo-cell.covered {
+  box-shadow: 0 0 0 4rpx #FF6F5E;
+}
+.cell-cover-mark {
+  position: absolute; left: 0; top: 0;
+  background: #FF6F5E; color: #fff; font-size: 20rpx;
+  padding: 4rpx 14rpx; border-radius: 16rpx 0 16rpx 0;
+}
+
+/* 相片墙空态 */
+.photo-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 20rpx;
+  padding: 56rpx 0;
+  background: #FBF9F8;
+  border: 2rpx dashed #E4DEDA;
+  border-radius: 20rpx;
+  cursor: pointer;
+}
+.empty-emoji { font-size: 64rpx; line-height: 1; }
+.empty-tip { font-size: 26rpx; color: #B8B2AF; }
+
+/* 相片墙有照片时的底部添加入口 */
+.photo-add-btn {
+  margin-top: 20rpx;
+  display: flex; align-items: center; justify-content: center; gap: 8rpx;
+  height: 72rpx;
+  background: #FFF3F0;
+  border: 2rpx solid #FFE0D8;
+  border-radius: 999rpx;
+  color: #FF6F5E;
+  cursor: pointer;
+}
+.add-btn-plus { font-size: 34rpx; line-height: 1; font-weight: 600; }
+.add-btn-text { font-size: 28rpx; font-weight: 600; }
+
 /* 家庭名牌卡 */
 .profile {
   display: flex; align-items: center; gap: 24rpx;
