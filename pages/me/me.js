@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -27,6 +27,15 @@ function buildView(family, openid) {
   };
 }
 
+// 时间格式化：Date/aO 对象 → 'YYYY-MM-DD HH:mm'
+function fmtTime(d) {
+  if (!d) return '';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  const p = (n) => (n < 10 ? '0' + n : '' + n);
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}`;
+}
+
 Page({
   data: {
     family: null,
@@ -47,6 +56,11 @@ Page({
     showFeedback: false,
     feedbackInput: '',
     feedbackMax: config.FEEDBACK_MAX_LEN,
+    // 反馈管理
+    showFeedbackList: false,
+    feedbacks: [],
+    feedbackUnread: 0,
+    adminOpenid: config.ADMIN_OPENID,
     version: config.APP_VERSION,
   },
 
@@ -77,6 +91,8 @@ Page({
       wx.setStorageSync('myFamily', family);
       wx.setStorageSync('myOpenid', openid);
       this.setData({ ...buildView(family, openid), loading: false });
+      // [debug] 反馈管理入口显隐调试：确认运行时 openid 是否等于 adminOpenid
+      console.log('[debug-feedback] myOpenid =', ',', openid, '| adminOpenid =', config.ADMIN_OPENID, '| isAdmin =', openid === config.ADMIN_OPENID);
     } catch (e) {
       // 网络失败但已有缓存时保留缓存内容，不打断浏览
       if (!this.data.family) this.setData({ loading: false });
@@ -172,7 +188,7 @@ Page({
     }
     wx.showLoading({ title: '提交中' });
     try {
-      await submitFeedback(content);
+      await submitFeedback(content, this.data.myNick);
       wx.hideLoading();
       this.setData({ showFeedback: false, feedbackInput: '' });
       wx.showToast({ title: '感谢反馈 💛', icon: 'none' });
@@ -180,6 +196,40 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: e.message || '提交失败', icon: 'none' });
     }
+  },
+
+  // —— 反馈管理 ——
+
+  async onFeedbackManage() {
+    const willShow = !this.data.showFeedbackList;
+    this.setData({ showFeedbackList: willShow });
+    if (willShow) await this.loadFeedbacks();
+  },
+
+  async loadFeedbacks() {
+    wx.showLoading({ title: '加载中' });
+    try {
+      const d = await listFeedbacks();
+      const feedbacks = (d.list || []).map((it) => ({ ...it, timeText: fmtTime(it.createdAt) }));
+      this.setData({ feedbacks, feedbackUnread: d.unread || 0 });
+      wx.hideLoading();
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '加载失败', icon: 'none' });
+    }
+  },
+
+  async onFeedbackItemRead(e) {
+    const id = e.currentTarget.dataset.id;
+    const it = this.data.feedbacks.find((x) => x.id === id);
+    if (!it || it.read) return;
+    try {
+      await markFeedbackRead(id);
+      this.setData({
+        feedbacks: this.data.feedbacks.map((x) => (x.id === id ? { ...x, read: true } : x)),
+        feedbackUnread: Math.max(0, this.data.feedbackUnread - 1),
+      });
+    } catch (err) { /* 静默 */ }
   },
 
   // —— 相片墙 ——

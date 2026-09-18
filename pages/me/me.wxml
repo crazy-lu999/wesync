@@ -188,6 +188,38 @@
       </view>
     </view>
 
+    <!-- 反馈管理入口（仅开发账户可见、可查看全量反馈） -->
+    <view wx:if="{{myOpenid && myOpenid === adminOpenid}}" class="card help-entry" hover-class="help-hover" bindtap="onFeedbackManage">
+      <view class="help-left">
+        <text class="card-title-icon">📋</text>
+        <text class="help-label">查看反馈</text>
+      </view>
+      <view class="help-right">
+        <text wx:if="{{feedbackUnread > 0}}" class="fb-badge">{{feedbackUnread}}条新</text>
+        <text class="muted">家人提交的反馈</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
+    <!-- 反馈列表 -->
+    <view wx:if="{{showFeedbackList}}" class="card feedback-list-box">
+      <view wx:if="{{!feedbacks.length}}" class="fb-empty muted">还没有反馈，去首页评论区逛逛吧～</view>
+      <view
+        wx:for="{{feedbacks}}"
+        wx:key="id"
+        class="fb-item {{item.read ? '' : 'fb-unread'}}"
+        bindtap="onFeedbackItemRead"
+        data-id="{{item.id}}"
+      >
+        <view class="fb-item-head">
+          <text class="fb-nick">{{item.nick}}</text>
+          <text class="fb-time muted">{{item.timeText}}</text>
+          <text wx:if="{{!item.read}}" class="fb-dot">●</text>
+        </view>
+        <view class="fb-content">{{item.content}}</view>
+      </view>
+    </view>
+
     <!-- 退出 -->
     <view class="card action-card">
       <button class="leave-btn" bindtap="onLeave">退出家庭</button>

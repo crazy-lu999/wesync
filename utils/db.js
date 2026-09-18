@@ -22,7 +22,10 @@ const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNi
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
 const updateNickname = (nick) => call('updateNickname', { nick });
-const submitFeedback = (content) => call('submitFeedback', { content });
+const submitFeedback = (content, nick) => call('submitFeedback', { content, nick });
+// 反馈管理（家庭成员可见）：拉列表 / 标记已读
+const listFeedbacks = () => call('listFeedbacks', {});
+const markFeedbackRead = (id) => call('markFeedbackRead', { id });
 // 家庭照片墙 / 家庭名修改（服务端写）
 const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos', fileIDs });
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
@@ -88,6 +91,8 @@ module.exports = {
   leaveFamily,
   updateNickname,
   submitFeedback,
+  listFeedbacks,
+  markFeedbackRead,
   addFamilyPhotos,
   removeFamilyPhoto,
   renameFamily,

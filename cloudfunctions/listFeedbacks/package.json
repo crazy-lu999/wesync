@@ -1,0 +1,9 @@
+{
+  "name": "listFeedbacks",
+  "version": "1.0.0",
+  "description": "拉取所有用户使用反馈（家庭管理视角）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
