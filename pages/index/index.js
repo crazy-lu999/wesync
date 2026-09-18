@@ -1,5 +1,5 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, toggleTodo, editTodo, removeTodo, subscribeTodos } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, editTodo, removeTodo, subscribeTodos, renameFamily } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
 const app = getApp();
 
@@ -23,6 +23,12 @@ Page({
     editing: false,
     editingId: '',
     inputFocus: false,
+    // 撒花庆祝
+    celebrate: false,
+    petals: [],
+    // 家庭名编辑
+    editingFamName: false,
+    famNameInput: '',
   },
 
   onShow() {
@@ -169,29 +175,45 @@ Page({
     }
   },
 
+  // 点击圆形勾选：方案A —— 完成即删除 + 撒花庆祝
   async onToggle(e) {
-    const { id, index } = e.currentTarget.dataset;
+    const { index } = e.currentTarget.dataset;
     const todo = this.data.todos[index];
     if (!todo) return;
-    const done = !todo.done;
-    // 乐观更新：先改本地，失败回滚
+    // 乐观删除：先本地移出，失败回滚
     const prev = this.data.todos.slice();
-    this.applyToggle(index, done);
+    this.removeLocally(index);
     try {
-      await toggleTodo(id, done);
+      await removeTodo(todo._id);
       this.fetchTodos(); // 立刻对齐服务端真实状态
+      this.showCelebrate(); // 撒花庆祝动画
     } catch (err) {
-      this.setData({ todos: prev });
-      wx.showToast({ title: '网络异常', icon: 'none' });
+      this.setData({ todos: prev, doneCount: prev.filter((t) => t.done).length, activeCount: prev.filter((t) => !t.done).length });
+      wx.showToast({ title: '完成失败，请重试', icon: 'none' });
     }
   },
 
-  applyToggle(index, done) {
+  // 本地移除一条待办并更新计数
+  removeLocally(index) {
     const todos = this.data.todos.slice();
-    todos[index] = { ...todos[index], done };
-    todos.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+    if (index < 0 || index >= todos.length) return;
+    todos.splice(index, 1);
     const doneCount = todos.filter((t) => t.done).length;
     this.setData({ todos, doneCount, activeCount: todos.length - doneCount });
+  },
+
+  // 长按弹出二级菜单：编辑 / 删除
+  onTodoLongPress(e) {
+    const { index } = e.currentTarget.dataset;
+    const todo = this.data.todos[index];
+    if (!todo) return;
+    wx.showActionSheet({
+      itemList: ['✏️ 编辑', '🗑️ 删除'],
+      success: (res) => {
+        if (res.tapIndex === 0) this.onEnterEdit(e);
+        else if (res.tapIndex === 1) this.onDeleteTodo(e);
+      },
+    });
   },
 
   // 行内按钮：编辑（直接进入编辑态，输入框回填已有内容再聚焦）
@@ -260,6 +282,36 @@ Page({
     wx.navigateTo({ url: '/pages/create/create' });
   },
 
+  // —— 家庭名改名 ——
+  onEditFamName() {
+    this.setData({ famNameInput: this.data.family ? this.data.family.name : '', editingFamName: true });
+  },
+  onCancelFamName() {
+    this.setData({ editingFamName: false, famNameInput: '' });
+  },
+  onFamNameInput(e) {
+    this.setData({ famNameInput: e.detail.value });
+  },
+  async onSaveFamName() {
+    const name = (this.data.famNameInput || '').trim().slice(0, 20);
+    if (!name) {
+      wx.showToast({ title: '名称不能为空', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中' });
+    try {
+      await renameFamily(name);
+      const fresh = await getMyFamily();
+      app.globalData.family = fresh.family;
+      this.setData({ family: fresh.family, editingFamName: false, famNameInput: '' });
+      wx.hideLoading();
+      wx.showToast({ title: '已改名', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
+  },
+
   goJoin() {
     wx.navigateTo({ url: '/pages/join/join' });
   },
@@ -267,4 +319,28 @@ Page({
   goMe() {
     wx.navigateTo({ url: '/pages/me/me' });
   },
+
+  // —— 撒花庆祝动画 ——
+  showCelebrate() {
+    const emojis = ['🌸', '🎉', '✨', '💐', '🌷', '🌟', '💫'];
+    const N = 30;
+    const petals = [];
+    for (let i = 0; i < N; i++) {
+      petals.push({
+        left: Math.random() * 100,               // 水平位置 %
+        size: 24 + Math.random() * 30,           // 花瓣大小 rpx
+        dur: 1.1 + Math.random() * 0.9,          // 上升时长 s
+        delay: Math.random() * 0.3,              // 延迟 s
+        drift: Math.random() * 40 - 20,          // 水平漂移 rpx
+        emoji: emojis[Math.floor(Math.random() * emojis.length)],
+      });
+    }
+    this.setData({ celebrate: true, petals });
+    // 动画结束后隐藏
+    if (this._celebrateTimer) clearTimeout(this._celebrateTimer);
+    this._celebrateTimer = setTimeout(() => this.setData({ celebrate: false }), 1800);
+  },
+
+  // 阻止庆祝层滚动穿透
+  noop() {},
 });

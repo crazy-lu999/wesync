@@ -45,6 +45,30 @@
   background: #fff; padding: 12rpx 24rpx; border-radius: 999rpx;
   box-shadow: 0 6rpx 18rpx rgba(80, 40, 20, 0.06);
 }
+
+/* 家庭名编辑 */
+.family-name.fam-editing {
+  flex: 1; margin-right: 16rpx; min-width: 0;
+}
+.fam-name-input {
+  flex: 1; min-width: 0; height: 56rpx; line-height: 56rpx;
+  padding: 0 16rpx;
+  border: 2rpx solid rgba(255, 111, 94, 0.4); border-radius: 12rpx;
+  background: #FFF6F3; font-size: 30rpx; font-weight: 600; color: #2A2626;
+}
+.fam-name-actions {
+  display: flex; align-items: center; gap: 6rpx; margin-left: 12rpx;
+}
+.fam-action-cancel {
+  color: #B8B2AF; font-size: 24rpx; font-weight: 600; padding: 8rpx 6rpx;
+}
+.fam-action-save {
+  color: #fff; font-size: 24rpx; font-weight: 600;
+  background: #FF6F5E; border-radius: 999rpx; padding: 10rpx 22rpx;
+  box-shadow: 0 6rpx 12rpx rgba(255, 111, 94, 0.28);
+}
+.fam-hover { opacity: 0.72; }
+
 .chev { font-size: 34rpx; line-height: 1; }
 
 /* 统计卡 */
@@ -108,21 +132,38 @@
 }
 .creator.mine { background: #FFEFEA; color: #FF6F5E; }
 
-/* 行内操作按钮（编辑 / 删除） */
-.todo-actions {
-  flex: none; margin-left: 18rpx;
-  display: flex; flex-direction: column; gap: 14rpx;
-  align-items: center;
+/* 长按待办提示点击态 */
+.todo-item.todo-hover { background: #FBF7F6; }
+
+/* 撒花庆祝动画 */
+.celebrate-mask {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+  z-index: 999;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
 }
-.action-btn {
-  width: 60rpx; height: 60rpx; border-radius: 18rpx;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28rpx;
-  background: #F7F5F4;
+.petal {
+  position: absolute; bottom: -60rpx;
+  line-height: 1;
+  /* 用 CSS 变量控制漂移与旋转，keyframes 里引用 */
+  --drift: 0rpx; --rot: 0deg;
+  animation-name: petalFloat;
+  animation-timing-function: ease-in;
+  animation-fill-mode: both;
 }
-.action-btn:active { opacity: 0.72; }
-.action-btn.edit { background: #FFF4F0; }
-.action-btn.del { background: #FFF0EE; }
+@keyframes petalFloat {
+  0% {
+    transform: translateY(0) translateX(0) rotate(var(--rot)) scale(0.6);
+    opacity: 0;
+  }
+  12% { opacity: 1; }
+  50% { transform: translateY(-60vh) translateX(var(--drift)) rotate(calc(var(--rot) + 180deg)) scale(1); }
+  100% {
+    transform: translateY(-120vh) translateX(calc(var(--drift) * 1.4)) rotate(calc(var(--rot) + 360deg)) scale(0.9);
+    opacity: 0;
+  }
+}
 
 /* 同步提示 */
 .sync-tip {
@@ -216,3 +257,14 @@
 .add-btn::after { border: none; }
 .add-btn.disable { background: #E8E3E0; color: #C4BFBC; box-shadow: none; }
 .add-btn.edit { padding: 0 44rpx; }
+
+/* 底部常态(新建)输入栏的添加按钮：紧凑小胶囊，不占宽；编辑态大按钮不受影响 */
+.input-bar .add-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 60rpx;
+  padding: 0 24rpx;
+  font-size: 25rpx;
+  border-radius: 999rpx;
+  box-shadow: 0 6rpx 12rpx rgba(255, 111, 94, 0.22);
+}

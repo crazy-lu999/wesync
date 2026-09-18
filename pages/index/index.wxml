@@ -18,7 +18,23 @@
   <!-- 有家庭：列表 -->
   <view wx:else class="list-wrap">
     <view class="topbar">
-      <view class="family-name">
+      <view wx:if="{{editingFamName}}" class="family-name fam-editing">
+        <view class="fam-dot">🏠</view>
+        <input
+          class="fam-name-input"
+          value="{{famNameInput}}"
+          focus
+          maxlength="20"
+          bindinput="onFamNameInput"
+          bindconfirm="onSaveFamName"
+          placeholder="给家起个名"
+        />
+        <view class="fam-name-actions">
+          <view class="fam-action-cancel" bindtap="onCancelFamName">取消</view>
+          <view class="fam-action-save" bindtap="onSaveFamName">保存</view>
+        </view>
+      </view>
+      <view wx:else class="family-name" bindlongpress="onEditFamName" hover-class="fam-hover">
         <view class="fam-dot">🏠</view>
         <text>{{family.name}}</text>
       </view>
@@ -52,6 +68,8 @@
         class="todo-item {{item.done ? 'done' : ''}}"
         data-id="{{item._id}}"
         data-index="{{index}}"
+        bindlongpress="onTodoLongPress"
+        hover-class="todo-hover"
       >
         <view
           class="checkbox {{item.done ? 'checked' : ''}}"
@@ -67,10 +85,6 @@
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
             <text class="muted">{{item.timeText}}</text>
           </view>
-        </view>
-        <view class="todo-actions">
-          <view class="action-btn edit" data-index="{{index}}" catchtap="onEnterEdit">✏️</view>
-          <view class="action-btn del" data-index="{{index}}" catchtap="onDeleteTodo">🗑️</view>
         </view>
       </view>
     </view>
@@ -129,6 +143,16 @@
         <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
       </view>
     </block>
+  </view>
+
+  <!-- 撒花庆祝动画（全屏，非阻塞） -->
+  <view wx:if="{{celebrate}}" class="celebrate-mask" catchtouchmove="noop">
+    <view
+      wx:for="{{petals}}"
+      wx:key="index"
+      class="petal"
+      style="left:{{item.left}}%; font-size:{{item.size}}rpx; width:{{item.size}}rpx; height:{{item.size}}rpx; animation-duration:{{item.dur}}s; animation-delay:{{item.delay}}s; --drift:{{item.drift}}rpx; --rot:{{item.rotStart}}deg;"
+    >{{item.emoji}}</view>
   </view>
 
 </view>
