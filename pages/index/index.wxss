@@ -191,7 +191,7 @@
 }
 
 .input-bar {
-  display: flex; align-items: flex-end; gap: 16rpx;
+  display: flex; align-items: center; gap: 16rpx;
   padding: 20rpx 24rpx;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: saturate(180%) blur(20rpx);
@@ -261,10 +261,13 @@
 /* 底部常态(新建)输入栏的添加按钮：紧凑小胶囊，不占宽；编辑态大按钮不受影响 */
 .input-bar .add-btn {
   flex: 0 0 auto;
+  width: auto;
   min-width: 0;
+  max-width: 156rpx;
   height: 60rpx;
   padding: 0 24rpx;
   font-size: 25rpx;
   border-radius: 999rpx;
   box-shadow: 0 6rpx 12rpx rgba(255, 111, 94, 0.22);
+  box-sizing: border-box;
 }
