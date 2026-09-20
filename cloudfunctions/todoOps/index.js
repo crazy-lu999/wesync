@@ -1,9 +1,11 @@
 // cloudfunctions/todoOps/index.js — 待办增删改（服务端写，绕过客户端安全规则）
-// action: 'add' | 'toggle' | 'remove' | 'edit'
+// action: 'add' | 'toggle' | 'important' | 'remove' | 'edit' | 'clearDone'
 // add:      { action:'add', familyId, content, openid, creatorNick }
-// toggle:   { action:'toggle', id, done }
+// toggle:   { action:'toggle', id, done }（完成时服务端记录完成人 + 累加家庭里程碑
+// important: { action:'important', id, important }
 // remove:   { action:'remove', id }
 // edit:     { action:'edit', id, content }
+// clearDone: { action:'clearDone' }（清空本家庭全部已完成）
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -44,8 +46,43 @@ exports.main = async (event) => {
       const id = String(event.id || '');
       if (!id) return { code: 1, message: '参数不完整' };
       const done = !!event.done;
+      // 查这条待办与其家庭，完成时记录完成人昵称并累加家庭里程碑
+      let doneNick = '';
+      let totalDone = null;
+      const t = await db.collection('todos').doc(id).get().catch(() => null);
+      const wasDone = !!(t && t.data && t.data.done);
+      if (done && !wasDone) {
+        // 找完成人在家庭里的昵称
+        try {
+          const familyId = (t && t.data && t.data.familyId) || '';
+          const famRes = familyId
+            ? await db.collection('families').doc(familyId).get()
+            : null;
+          const members = (famRes && famRes.data && famRes.data.members) || [];
+          const nicks = (famRes && famRes.data && famRes.data.memberNicks) || {};
+          doneNick = nicks[OPENID] || '';
+          if (members.includes(OPENID)) {
+            // 累加家庭“一起完成”里程碑
+            totalDone = (famRes.data.totalDone || 0) + 1;
+            await db.collection('families').doc(familyId).update({
+              data: { totalDone },
+            });
+          }
+        } catch (e) { /* 里程碑/昵称尽力即可 */ }
+      }
+      const data = { done, doneTime: done ? db.serverDate() : null };
+      if (doneNick) { data.doneBy = OPENID; data.doneNick = doneNick; }
+      else if (done) { data.doneBy = OPENID; data.doneNick = '已完成'; }
+      else { data.doneBy = ''; data.doneNick = ''; }
+      await db.collection('todos').doc(id).update({ data });
+      return { code: 0, message: 'ok', data: { totalDone } };
+    }
+
+    if (event.action === 'important') {
+      const id = String(event.id || '');
+      if (!id) return { code: 1, message: '参数不完整' };
       await db.collection('todos').doc(id).update({
-        data: { done, doneTime: done ? db.serverDate() : null },
+        data: { important: !!event.important },
       });
       return { code: 0, message: 'ok', data: {} };
     }
@@ -63,6 +100,16 @@ exports.main = async (event) => {
       if (!id) return { code: 1, message: '参数不完整' };
       await db.collection('todos').doc(id).remove();
       return { code: 0, message: 'ok', data: {} };
+    }
+
+    if (event.action === 'clearDone') {
+      // 找当前用户所在家庭，删除其下全部已完成
+      const famRes = await db.collection('families').where({ members: OPENID }).limit(1).get();
+      if (!famRes.data.length) return { code: 1, message: '未找到你的家庭' };
+      const familyId = famRes.data[0]._id;
+      const del = await db.collection('todos').where({ familyId, done: true }).remove();
+      const removed = (del && del.stats && del.stats.removed) || 0;
+      return { code: 0, message: 'ok', data: { removed } };
     }
 
     return { code: 1, message: '未知 action' };

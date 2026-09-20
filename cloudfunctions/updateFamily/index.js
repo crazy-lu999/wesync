@@ -87,5 +87,15 @@ exports.main = async (event) => {
     return { code: 0, message: '已保存', data: { wallTitle } };
   }
 
+  // —— 悄悄话留言墙 ——
+  if (action === 'setNote') {
+    const text = (event.text || '').trim().slice(0, 100);
+    if (!text) return { code: -1, message: '留言不能为空' };
+    const nicks = fam.memberNicks || {};
+    const nick = nicks[OPENID] || '我';
+    await famRef.update({ data: { note: { text, nick, time: db.serverDate() } } });
+    return { code: 0, message: '已留言', data: { note: { text, nick } } };
+  }
+
   return { code: -1, message: '未知操作' };
 };
