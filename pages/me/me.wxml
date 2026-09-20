@@ -257,4 +257,11 @@
     <!-- 版本信息 -->
     <view class="version-foot muted">wesync共享笔记 v{{version}}</view>
   </block>
+
+  <!-- 手动刷新悬浮按钮（家庭成员拉取最新数据） -->
+  <view wx:if="{{family}}" class="refresh-fab" bindtap="onRefresh" hover-class="refresh-fab-hover">
+    <text class="refresh-spark">✨</text>
+    <text class="refresh-icon">🍀</text>
+    <text class="refresh-label">刷新</text>
+  </view>
 </view>

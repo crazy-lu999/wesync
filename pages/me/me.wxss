@@ -1,5 +1,5 @@
 /* pages/me/me.wxss */
-.page { padding-top: 40rpx; }
+.page { padding-top: 40rpx; padding-bottom: 220rpx; }
 
 /* 相片墙标题：点击可改名 */
 .wall-title-tap {
@@ -246,6 +246,46 @@
 
 /* 版本信息 */
 .version-foot { text-align: center; margin: 36rpx 0 60rpx; }
+
+/* 手动刷新悬浮按钮（右下角，可爱圆球） */
+.refresh-fab {
+  position: fixed; right: 30rpx; bottom: 64rpx; z-index: 60;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0rpx;
+  width: 108rpx; height: 108rpx; border-radius: 50%;
+  background: linear-gradient(135deg, #FFB199, #FF6F5E, #FF917A); color: #fff;
+  box-shadow:
+    0 12rpx 26rpx rgba(255, 111, 94, 0.42),
+    inset 0 4rpx 8rpx rgba(255, 255, 255, 0.4),
+    inset 0 -6rpx 12rpx rgba(180, 60, 40, 0.16);
+  animation: fabBob 2.8s ease-in-out infinite;
+}
+/* 左上角高光小圆点，更 Q */
+.refresh-fab::after {
+  content: ''; position: absolute; top: 16rpx; left: 20rpx;
+  width: 22rpx; height: 14rpx; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transform: rotate(-30deg);
+}
+/* 右上角小星星，轻轻一闪 */
+.refresh-spark {
+  position: absolute; top: -4rpx; right: 0rpx;
+  font-size: 28rpx; line-height: 1;
+  animation: sparkTwinkle 2.4s ease-in-out infinite;
+}
+.refresh-icon { font-size: 44rpx; line-height: 1; }
+.refresh-label { font-size: 18rpx; font-weight: 600; line-height: 1.2; }
+@keyframes fabBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9rpx); }
+}
+@keyframes sparkTwinkle {
+  0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  50% { opacity: 0.45; transform: scale(0.72) rotate(20deg); }
+}
+.refresh-fab-hover {
+  transform: scale(0.94); opacity: 0.9;
+  animation-play-state: paused;
+}
 
 /* 退出 */
 .action-card { padding: 24rpx; }

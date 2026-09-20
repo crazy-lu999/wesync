@@ -106,6 +106,18 @@ Page({
     }
   },
 
+  // 手动刷新：成员可点悬浮按钮拉取最新家庭数据（含相片墙/悄悄话/昵称）
+  onRefresh() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    wx.showLoading({ title: '刷新中', mask: true });
+    this.load().finally(() => {
+      this._refreshing = false;
+      wx.hideLoading();
+      wx.showToast({ title: '已刷新', icon: 'success' });
+    });
+  },
+
   clearCache(fid) {
     wx.removeStorageSync('myFamily');
     wx.removeStorageSync('myOpenid');
