@@ -32,6 +32,8 @@ const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhot
 const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
 const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
 const setCover = (fileID) => call('updateFamily', { action: 'setCover', fileID });
+// 悄悄话留言墙
+const setNote = (text) => call('updateFamily', { action: 'setNote', text });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
@@ -46,7 +48,18 @@ async function addTodo(familyId, content, openid, creatorNick) {
 }
 
 async function toggleTodo(id, done) {
-  await call('todoOps', { action: 'toggle', id, done });
+  // 返回 { totalDone }（家庭累计完成件数，用于里程碑）
+  return call('todoOps', { action: 'toggle', id, done });
+}
+
+// 标记/取消「重要」
+async function setImportant(id, important) {
+  await call('todoOps', { action: 'important', id, important });
+}
+
+// 一键清空该家庭全部已完成
+async function clearDoneTodos() {
+  await call('todoOps', { action: 'clearDone' });
 }
 
 async function removeTodo(id) {
@@ -98,8 +111,11 @@ module.exports = {
   renameFamily,
   setWallTitle,
   setCover,
+  setNote,
   addTodo,
   toggleTodo,
+  setImportant,
+  clearDoneTodos,
   editTodo,
   removeTodo,
   getMyTodos,
