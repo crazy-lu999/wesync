@@ -92,6 +92,20 @@
 .add-btn-plus { font-size: 34rpx; line-height: 1; font-weight: 600; }
 .add-btn-text { font-size: 28rpx; font-weight: 600; }
 
+/* 悄悄话留言墙 */
+.note-bubble {
+  background: #FFF3F0; border-radius: 20rpx;
+  padding: 26rpx 28rpx; font-size: 30rpx; line-height: 1.6;
+  color: #4A3F3B; margin-top: 8rpx;
+  border: 1rpx solid #FFE0D8;
+}
+.note-meta { margin-top: 12rpx; font-size: 24rpx; text-align: right; }
+.note-empty {
+  padding: 28rpx 0; text-align: center;
+  font-size: 26rpx; color: #B8B2AF; background: #FAF7F6;
+  border-radius: 18rpx; margin-top: 8rpx;
+}
+
 /* 家庭名牌卡 */
 .profile {
   display: flex; align-items: center; gap: 24rpx;

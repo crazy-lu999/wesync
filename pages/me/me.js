@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover, setNote, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -14,6 +14,7 @@ function buildView(family, openid) {
   }));
   const photos = (family && family.photos) || [];
   const cover = (family && family.cover) || '';
+  const note = (family && family.note) || null;
   return {
     family: family || null,
     myOpenid: openid || '',
@@ -24,6 +25,7 @@ function buildView(family, openid) {
     coverIndex: cover ? photos.indexOf(cover) : -1,
     photoWallTitle: ((family && family.wallTitle) || '').trim() || config.PHOTO_WALL_TITLE,
     photoMax: 9,
+    note,
   };
 }
 
@@ -49,6 +51,10 @@ Page({
     photoWallTitle: config.PHOTO_WALL_TITLE,
     editingWallTitle: false,
     wallTitleInput: '',
+    // 悄悄话留言墙
+    note: null,
+    editingNote: false,
+    noteInput: '',
     loading: true,
     editingNick: false,
     nickInput: '',
@@ -266,6 +272,42 @@ Page({
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
+  },
+
+  // —— 悄悄话留言墙 ——
+  onEditNote() {
+    const cur = (this.data.note && this.data.note.text) || '';
+    this.setData({ noteInput: cur, editingNote: true });
+  },
+  onCancelNote() {
+    this.setData({ editingNote: false, noteInput: '' });
+  },
+  onNoteInput(e) {
+    this.setData({ noteInput: e.detail.value });
+  },
+  async onSaveNote() {
+    const text = (this.data.noteInput || '').trim().slice(0, 100);
+    if (!text) {
+      wx.showToast({ title: '写点内容吧', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '发送中' });
+    try {
+      await setNote(text);
+      const fresh = await getMyFamily();
+      app.globalData.family = fresh.family;
+      wx.setStorageSync('myFamily', fresh.family);
+      this.setData({
+        ...buildView(fresh.family, fresh.openid),
+        editingNote: false,
+        noteInput: '',
+      });
+      wx.hideLoading();
+      wx.showToast({ title: '已留言', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '发送失败', icon: 'none' });
     }
   },
 

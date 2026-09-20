@@ -82,6 +82,35 @@
       </view>
     </view>
 
+    <!-- 悄悄话：给对方留一句话 -->
+    <view class="card">
+      <view class="card-title">
+        <text class="card-title-icon">💌</text>
+        <text>悄悄话</text>
+        <text wx:if="{{!editingNote}}" class="nick-hint" bindtap="onEditNote" hover-class="cell-hover">写一句</text>
+      </view>
+      <view wx:if="{{!editingNote}}">
+        <view wx:if="{{note}}" class="note-bubble">{{note.text}}</view>
+        <view wx:if="{{note}}" class="note-meta muted">—— {{note.nick}}</view>
+        <view wx:else class="note-empty" bindtap="onEditNote" hover-class="cell-hover">还没有留言，给对方写一句悄悄话吧 ✍️</view>
+      </view>
+      <view wx:else class="member-edit-row">
+        <input
+          class="nick-input"
+          value="{{noteInput}}"
+          focus
+          maxlength="100"
+          bindinput="onNoteInput"
+          bindconfirm="onSaveNote"
+          placeholder="把想说的话写在这里…"
+        />
+        <view class="nick-actions">
+          <view class="copy-btn" bindtap="onCancelNote">取消</view>
+          <view class="save-btn" bindtap="onSaveNote">发送</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 邀请码卡：家庭两名成员齐了就不再显示，无意义 -->
     <view wx:if="{{members.length < 2}}" class="card invite-card">
       <view class="card-title">
@@ -226,6 +255,6 @@
     </view>
 
     <!-- 版本信息 -->
-    <view class="version-foot muted">我们的小本本 v{{version}}</view>
+    <view class="version-foot muted">wesync共享笔记 v{{version}}</view>
   </block>
 </view>
