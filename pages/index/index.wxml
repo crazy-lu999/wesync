@@ -17,6 +17,8 @@
 
   <!-- 有家庭：列表 -->
   <view wx:else class="list-wrap">
+    <!-- 语义化同步事件提示条 -->
+    <view wx:if="{{syncTip}}" class="sync-event-tip">{{syncTip}}</view>
     <view class="topbar">
       <view wx:if="{{editingFamName}}" class="family-name fam-editing">
         <view class="fam-dot">🏠</view>
@@ -56,9 +58,24 @@
       </view>
     </view>
 
+    <view class="stat-sub">
+      <text class="stat-total">🎯 你们一起完成了 {{totalDone}} 件</text>
+      <text wx:if="{{doneCount}}" class="clear-done" bindtap="onClearDone">清空已完成</text>
+    </view>
+
     <view wx:if="{{todosReady && todos.length === 0}}" class="empty">
       <view class="empty-emoji">📝</view>
       <view class="muted">还没有待办，加一条吧</view>
+      <view class="tpl-title muted">不想想？挑一个 👇</view>
+      <view class="tpl-list">
+        <view
+          class="tpl-chip"
+          wx:for="{{templates}}"
+          wx:key="*this"
+          bindtap="useTemplate"
+          data-content="{{item}}"
+        >{{item}}</view>
+      </view>
     </view>
 
     <view wx:else class="todo-list">
@@ -80,10 +97,14 @@
           <text class="check-mark" wx:if="{{item.done}}">✓</text>
         </view>
         <view class="todo-main">
-          <view class="todo-content">{{item.content}}</view>
+          <view class="todo-line">
+            <text wx:if="{{item.important && !item.done}}" class="imp-star">⭐</text>
+            <view class="todo-content">{{item.content}}</view>
+          </view>
           <view class="todo-meta">
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
-            <text class="muted">{{item.timeText}}</text>
+            <text wx:if="{{item.done}}" class="meta-done">✓ {{item.doneNick || '已完成'}}</text>
+            <text class="muted">{{item.done && item.doneTimeText ? item.doneTimeText : item.timeText}}</text>
           </view>
         </view>
       </view>
@@ -100,6 +121,12 @@
         <text class="sync-dot amber">●</text> 已同步 · 对方改动约几秒内出现
       </block>
     </view>
+  </view>
+
+  <!-- 撤销提示条：删除/清空后 5 秒内可撤回 -->
+  <view wx:if="{{undoLabel}}" class="undo-bar">
+    <text class="undo-text">{{undoLabel}}</text>
+    <view class="undo-btn" bindtap="onUndo" hover-class="undo-btn-hover">撤销</view>
   </view>
 
   <!-- 底部输入栏（仅在有家庭时显示） -->

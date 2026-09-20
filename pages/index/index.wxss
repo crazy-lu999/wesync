@@ -92,6 +92,67 @@
   filter: drop-shadow(0 10rpx 18rpx rgba(80, 40, 20, 0.12));
 }
 
+/* 顶部语义化同步事件提示条 */
+.sync-event-tip {
+  position: sticky; top: 0; z-index: 20;
+  background: linear-gradient(135deg, #FF6F5E, #FF917A); color: #fff;
+  font-size: 26rpx; font-weight: 600;
+  padding: 20rpx 28rpx; margin: 16rpx 24rpx 0;
+  border-radius: 18rpx; text-align: center;
+  box-shadow: 0 10rpx 22rpx rgba(255, 111, 94, 0.32);
+  animation: tipIn 0.3s ease;
+}
+@keyframes tipIn { from { transform: translateY(-12rpx); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* 统计栏下方：一起完成件数 + 清空已完成 */
+.stat-sub {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24rpx 8rpx; margin-top: 8rpx;
+}
+.stat-total { font-size: 24rpx; color: #A09B98; }
+.clear-done {
+  font-size: 24rpx; color: #FF6F5E; font-weight: 600;
+  padding: 6rpx 18rpx; border-radius: 999rpx; border: 1rpx solid rgba(255, 111, 94, 0.35);
+}
+.clear-done:active { background: #FFEFEA; }
+
+/* 空态示例模板 */
+.tpl-title { margin-top: 36rpx; font-size: 24rpx; }
+.tpl-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 16rpx; margin-top: 20rpx; }
+.tpl-chip {
+  font-size: 26rpx; color: #FF6F5E; background: #FFF0EC;
+  padding: 14rpx 26rpx; border-radius: 999rpx;
+  box-shadow: 0 4rpx 10rpx rgba(80, 40, 20, 0.06);
+}
+.tpl-chip:active { background: #FFE3DC; }
+
+/* 待办正文行：重要星标 + 内容 */
+.todo-line { display: flex; align-items: flex-start; }
+.imp-star { flex: none; font-size: 28rpx; margin-right: 8rpx; line-height: 1.5; }
+.meta-done { color: #52C41A; font-weight: 600; }
+
+/* 底部撤销提示条 */
+.undo-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 150rpx; z-index: 60;
+  display: flex; align-items: center; gap: 20rpx;
+  background: rgba(42, 38, 38, 0.92); color: #fff;
+  padding: 20rpx 30rpx; border-radius: 999rpx;
+  box-shadow: 0 14rpx 34rpx rgba(0, 0, 0, 0.28);
+  max-width: 90%; width: max-content;
+  animation: undoIn 0.25s ease;
+}
+@keyframes undoIn { from { transform: translateX(-50%) translateY(16rpx); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+.undo-text {
+  font-size: 26rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 420rpx;
+}
+.undo-btn {
+  font-size: 26rpx; font-weight: 700; color: #FF917A;
+  padding: 6rpx 10rpx;
+}
+.undo-btn-hover { opacity: 0.6; }
+
 /* 列表 */
 .todo-list { padding: 0 24rpx; }
 .todo-item {
@@ -103,7 +164,16 @@
   transition: opacity 0.2s, transform 0.1s;
 }
 .todo-item:active { transform: scale(0.99); }
-.todo-item.done { opacity: 0.5; }
+.todo-item.done {
+  opacity: 0.6;
+  animation: doneSettle 0.5s ease;
+}
+/* 完成过渡：整卡轻微缩放并沉到半透明 */
+@keyframes doneSettle {
+  0%   { opacity: 1; transform: scale(1); }
+  35%  { transform: scale(0.97); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
 
 .checkbox {
   flex: none; width: 48rpx; height: 48rpx; border-radius: 50%;
@@ -117,10 +187,26 @@
   background: linear-gradient(135deg, #FF6F5E, #FF917A);
   box-shadow: 0 6rpx 14rpx rgba(255, 111, 94, 0.35);
 }
+/* 勾选对勾弹出 */
+.checkbox.checked .check-mark { animation: checkPop 0.35s ease; }
+@keyframes checkPop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
 
 .todo-main { flex: 1; min-width: 0; }
-.todo-content { font-size: 32rpx; line-height: 1.5; word-break: break-word; font-weight: 500; }
-.todo-item.done .todo-content { text-decoration: line-through; color: #B8B2AF; }
+.todo-content { position: relative; width: fit-content; font-size: 32rpx; line-height: 1.5; word-break: break-word; font-weight: 500; }
+/* 已完成正文：删除线从左到右划出 */
+.todo-item.done .todo-content { text-decoration: none; color: #B8B2AF; }
+.todo-item.done .todo-content::after {
+  content: "";
+  position: absolute; left: 0; top: 52%;
+  width: 100%; height: 3rpx; background: #B8B2AF; border-radius: 2rpx;
+  transform: scaleX(0); transform-origin: left center;
+  animation: strike 0.4s ease forwards;
+}
+@keyframes strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .todo-meta {
   margin-top: 12rpx; font-size: 24rpx; gap: 16rpx;
   display: flex; align-items: center; flex-wrap: wrap; row-gap: 10rpx;
