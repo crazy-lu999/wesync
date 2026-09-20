@@ -6,6 +6,39 @@ const app = getApp();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 今天（本地日期，YYYY-MM-DD），用于日期选择的 start 下限，禁止选过去的日子
+const todayStr = (() => {
+  const n = new Date();
+  const p = (x) => String(x).padStart(2, '0');
+  return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
+})();
+
+// 一次性截止日期 → 剩余天数可视化信息。返回 null 表示未标记日期。
+function calcDeadline(deadline) {
+  if (!deadline) return null;
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(deadline);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(y, mo - 1, d);
+  const days = Math.round((target - today) / 86400000);
+  const label = `${mo}月${d}日`;
+  let text, state;
+  if (days < 0) { state = 'past'; text = `已过 ${-days} 天`; }
+  else if (days === 0) { state = 'today'; text = '就是今天 🎉'; }
+  else if (days === 1) { state = 'soon'; text = '明天就到啦'; }
+  else if (days <= 7) { state = 'soon'; text = `还有 ${days} 天 · 快到了`; }
+  else { state = 'normal'; text = `还有 ${days} 天`; }
+  return { days, label, text, state };
+}
+
+// 摘要成一行文案（用于输入栏 chip：如「8月5日 · 还有 3 天」）
+function deadlineChipText(deadline) {
+  const info = calcDeadline(deadline);
+  return info ? `${info.label} · ${info.text}` : (deadline || '');
+}
+
 Page({
   data: {
     loading: true,
@@ -25,6 +58,9 @@ Page({
     totalDone: 0, // 你们一起累计完成的件数（里程碑）
     syncTip: '', // 语义化同步提示（TA 刚完成了…）
     templates: config.TODO_TEMPLATES,
+    inputDeadline: '', // 新建/编辑时标记的一次性截止日期 YYYY-MM-DD
+    inputDeadlineText: '', // 同上的倒计时文案（如 8月5日 · 还有 3 天）
+    today: todayStr,    // 日期选择的下限（今天），禁止选过去的日子
     undoLabel: '', // 删除/清空的撤销提示条文案
     // 编辑态
     editing: false,
@@ -176,15 +212,10 @@ Page({
       timeText: fmtTime(t.createTime),
       doneTimeText: fmtTime(t.doneTime),
       mine: t.creatorOpenid === this.data.myOpenid,
+      dayInfo: calcDeadline(t.deadline),
     }));
-    // 未完成在前（重要未完成再优先）；已完成沉底，同类按创建时间倒序
-    mapped.sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      if (!a.done && (a.important !== b.important)) return a.important ? -1 : 1;
-      const ta = a.createTime ? +new Date(a.createTime) : 0;
-      const tb = b.createTime ? +new Date(b.createTime) : 0;
-      return tb - ta;
-    });
+    // 未完成在前（重要>临近7天>普通），已完成沉底；同类按创建时间倒序
+    mapped.sort((a, b) => this.cmpTodos(a, b));
     const doneCount = mapped.filter((t) => t.done).length;
     this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount });
     // 记录本次快照，供 announceChanges 做同源对比
@@ -203,6 +234,15 @@ Page({
     this.setData({ inputVal: e.detail.value });
   },
 
+  // 选/清截止日期
+  onPickDeadline(e) {
+    const v = e.detail.value || '';
+    this.setData({ inputDeadline: v, inputDeadlineText: deadlineChipText(v) });
+  },
+  onClearDeadline() {
+    this.setData({ inputDeadline: '', inputDeadlineText: '' });
+  },
+
   async onAdd() {
     const content = (this.data.inputVal || '').trim();
     if (!content) return;
@@ -210,10 +250,11 @@ Page({
       await this.saveEdit(content);
       return;
     }
-    this.setData({ inputVal: '' });
+    const deadline = this.data.inputDeadline; // 先取日期，再清空状态
+    this.setData({ inputVal: '', inputDeadline: '', inputDeadlineText: '' });
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick);
+      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, deadline);
       this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
       wx.hideLoading();
     } catch (e) {
@@ -283,15 +324,29 @@ Page({
     this.setData({ todos, doneCount, activeCount: todos.length - doneCount });
   },
 
-  // 排序规则：未完成在前（重要优先），已完成沉底，同类按创建时间倒序
+  // 排序规则：未完成在前（重要优先，其次临近7天的日子），已完成沉底，同类按创建时间倒序
   sortTodos(arr) {
-    return arr.slice().sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      if (!a.done && (a.important !== b.important)) return a.important ? -1 : 1;
-      const ta = a.createTime ? +new Date(a.createTime) : 0;
-      const tb = b.createTime ? +new Date(b.createTime) : 0;
-      return tb - ta;
-    });
+    return arr.slice().sort((a, b) => this.cmpTodos(a, b));
+  },
+
+  cmpTodos(a, b) {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (!a.done) {
+      const pa = this.todoPriority(a);
+      const pb = this.todoPriority(b);
+      if (pa !== pb) return pa - pb;
+    }
+    const ta = a.createTime ? +new Date(a.createTime) : 0;
+    const tb = b.createTime ? +new Date(b.createTime) : 0;
+    return tb - ta;
+  },
+
+  // 未完成待办的优先级：重要 > 临近7天 > 普通
+  todoPriority(t) {
+    if (t.important) return 0;
+    const d = t.dayInfo && t.dayInfo.days;
+    if (d != null && d >= 0 && d <= 7) return 1;
+    return 2;
   },
 
   // 完成动画结束后，把已完成的统一沉到列表底部
@@ -451,6 +506,8 @@ Page({
       editing: true,
       editingId: todo._id,
       inputVal: todo.content || '',
+      inputDeadline: todo.deadline || '',
+      inputDeadlineText: deadlineChipText(todo.deadline || ''),
       inputFocus: false,
     });
     const that = this;
@@ -485,13 +542,13 @@ Page({
 
   // 取消编辑
   cancelEdit() {
-    this.setData({ editing: false, editingId: '', inputVal: '', inputFocus: false });
+    this.setData({ editing: false, editingId: '', inputVal: '', inputDeadline: '', inputDeadlineText: '', inputFocus: false });
   },
 
   async saveEdit(content) {
     wx.showLoading({ title: '保存中' });
     try {
-      await editTodo(this.data.editingId, content);
+      await editTodo(this.data.editingId, content, this.data.inputDeadline);
       this.suppressChange(this.data.editingId);
       this.cancelEdit();
       this.fetchTodos(); // 立刻刷新，编辑零延迟可见

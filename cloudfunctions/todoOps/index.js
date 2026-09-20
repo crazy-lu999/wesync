@@ -16,6 +16,7 @@ exports.main = async (event) => {
     if (event.action === 'add') {
       const familyId = String(event.familyId || '');
       const content = String(event.content || '').trim();
+      const deadline = event.deadline ? String(event.deadline) : null;
       if (!familyId || !content) return { code: 1, message: '参数不完整' };
       // 取该家庭成员 openid，写入 todo.members，供 read 规则用 auth.openid in doc.members 判断
       let members = [];
@@ -35,6 +36,7 @@ exports.main = async (event) => {
           members,
           creatorOpenid: OPENID,
           creatorNick: String(event.creatorNick || '我'),
+          deadline,
           createTime: db.serverDate(),
           doneTime: null,
         },
@@ -91,7 +93,12 @@ exports.main = async (event) => {
       const id = String(event.id || '');
       const content = String(event.content || '').trim();
       if (!id || !content) return { code: 1, message: '编辑内容不能为空' };
-      await db.collection('todos').doc(id).update({ data: { content } });
+      const data = { content };
+      // deadline 显式更新（传空串即清除日期）
+      if (event.hasOwnProperty('deadline')) {
+        data.deadline = event.deadline ? String(event.deadline) : null;
+      }
+      await db.collection('todos').doc(id).update({ data });
       return { code: 0, message: 'ok', data: {} };
     }
 

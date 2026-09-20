@@ -105,6 +105,11 @@
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
             <text wx:if="{{item.done}}" class="meta-done">✓ {{item.doneNick || '已完成'}}</text>
             <text class="muted">{{item.done && item.doneTimeText ? item.doneTimeText : item.timeText}}</text>
+            <!-- 截止日期倒计时徽标（跟在创建人/时间后面） -->
+            <view wx:if="{{item.dayInfo && !item.done}}" class="cd-badge {{item.dayInfo.state}}">
+              <text class="cd-label">⏰ {{item.dayInfo.label}}</text>
+              <text class="cd-text">{{item.dayInfo.text}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -148,6 +153,16 @@
           cursor-spacing="140"
           bindinput="onInput"
         ></textarea>
+        <!-- 编辑态：截止日期 -->
+        <picker mode="date" value="{{today}}" start="{{today}}" bindchange="onPickDeadline" class="cd-picker">
+          <view class="cd-chip wide {{inputDeadline ? 'set' : ''}}">
+            <block wx:if="{{inputDeadline}}">
+              <text class="cd-chip-set">⏰ {{inputDeadlineText}}</text>
+              <text class="cd-chip-x" catchtap="onClearDeadline">✕</text>
+            </block>
+            <text wx:else>⏰ 倒计时</text>
+          </view>
+        </picker>
         <view class="edit-actions">
           <button class="edit-cancel" bindtap="cancelEdit">取消</button>
           <button class="add-btn edit {{inputVal ? '' : 'disable'}}" bindtap="onAdd">保存</button>
@@ -167,6 +182,16 @@
           cursor-spacing="140"
           bindinput="onInput"
         ></textarea>
+        <!-- 新建态：截止日期（有输入内容时作为可选项出现，用户自选） -->
+        <picker wx:if="{{inputVal}}" mode="date" value="{{today}}" start="{{today}}" bindchange="onPickDeadline" class="cd-picker">
+          <view class="cd-chip {{inputDeadline ? 'set' : ''}}">
+            <block wx:if="{{inputDeadline}}">
+              <text class="cd-chip-set">⏰ {{inputDeadlineText}}</text>
+              <text class="cd-chip-x" catchtap="onClearDeadline">✕</text>
+            </block>
+            <text wx:else>⏰ 倒计时</text>
+          </view>
+        </picker>
         <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
       </view>
     </block>
