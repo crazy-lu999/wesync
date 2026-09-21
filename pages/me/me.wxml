@@ -48,7 +48,7 @@
 
       <!-- 封面：设了封面后顶部整幅展示 -->
       <view wx:if="{{cover}}" class="cover-wrap">
-        <image class="cover-img" src="{{cover}}" mode="aspectFill" bindtap="onPreviewPhoto" data-url="{{cover}}" data-index="{{coverIndex}}"/>
+        <image class="cover-img" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewPhoto" data-index="{{coverIndex}}"/>
         <view class="cover-tag">🌟 封面</view>
       </view>
 
@@ -64,13 +64,12 @@
           class="photo-cell {{item === cover ? 'covered' : ''}}"
           wx:for="{{photos}}"
           wx:key="*this"
-          data-url="{{item}}"
           data-index="{{index}}"
           bindtap="onPreviewPhoto"
           bindlongpress="onPhotoMenu"
           hover-class="cell-hover"
         >
-          <image class="photo-img" src="{{item}}" mode="aspectFill" lazy-load/>
+          <image class="photo-img" src="{{photoUrls[index]}}" mode="aspectFill" lazy-load/>
           <view wx:if="{{item === cover}}" class="cell-cover-mark">封面</view>
         </view>
       </view>

@@ -3,7 +3,8 @@ const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhoto
 const config = require('../../utils/config.js');
 const app = getApp();
 
-// 由 (family, openid) 生成页面视图数据
+// 由 (family, openid) 生成页面视图数据。
+// 注意：photos/cover 是 fileID，photoUrls/coverUrl 是云函数下发的临时可访问 URL（跨成员可看）。
 function buildView(family, openid) {
   const memberNicks = (family && family.memberNicks) || {};
   const myNick = memberNicks[openid] || '我';
@@ -13,7 +14,10 @@ function buildView(family, openid) {
     me: o === openid,
   }));
   const photos = (family && family.photos) || [];
+  // 优先用云函数返回的临时 URL；老缓存没有时回退为 fileID
+  const photoUrls = family && Array.isArray(family.photoUrls) ? family.photoUrls : photos.slice();
   const cover = (family && family.cover) || '';
+  const coverUrl = cover ? ((family && family.coverUrl) || cover) : '';
   const note = (family && family.note) || null;
   return {
     family: family || null,
@@ -21,7 +25,9 @@ function buildView(family, openid) {
     myNick,
     members,
     photos,
+    photoUrls,
     cover,
+    coverUrl,
     coverIndex: cover ? photos.indexOf(cover) : -1,
     photoWallTitle: ((family && family.wallTitle) || '').trim() || config.PHOTO_WALL_TITLE,
     photoMax: 9,
@@ -45,7 +51,9 @@ Page({
     myNick: '我',
     members: [],
     photos: [], // 云存储 fileID 列表
+    photoUrls: [], // 与 photos 一一对应的临时可访问 URL（对方也能看图）
     cover: '', // 封面 fileID
+    coverUrl: '', // 封面临时可访问 URL
     coverIndex: -1,
     photoMax: 9,
     photoWallTitle: config.PHOTO_WALL_TITLE,
@@ -77,8 +85,13 @@ Page({
     if (cachedFamily && cachedOpenid) {
       this.setData({ ...buildView(cachedFamily, cachedOpenid), loading: false });
     }
-    // 后台静默拉一次最新家庭数据覆盖，保证成员/昵称是最新的
+    // 后台静默拉一次最新家庭数据覆盖，保证成员/昵称/照片是最新的
     this.load();
+  },
+
+  // 用云函数返回的最新家庭数据渲染视图（照片临时 URL 已由云端解析好）
+  applyFamily(family, openid, extra) {
+    this.setData({ ...buildView(family, openid), ...(extra || {}) });
   },
 
   async load() {
@@ -96,7 +109,7 @@ Page({
       // 缓存，下次进入无需等云函数
       wx.setStorageSync('myFamily', family);
       wx.setStorageSync('myOpenid', openid);
-      this.setData({ ...buildView(family, openid), loading: false });
+      await this.applyFamily(family, openid, { loading: false });
       // [debug] 反馈管理入口显隐调试：确认运行时 openid 是否等于 adminOpenid
       console.log('[debug-feedback] myOpenid =', ',', openid, '| adminOpenid =', config.ADMIN_OPENID, '| isAdmin =', openid === config.ADMIN_OPENID);
     } catch (e) {
@@ -274,11 +287,7 @@ Page({
       const fresh = await getMyFamily();
       app.globalData.family = fresh.family;
       wx.setStorageSync('myFamily', fresh.family);
-      this.setData({
-        ...buildView(fresh.family, fresh.openid),
-        editingWallTitle: false,
-        wallTitleInput: '',
-      });
+      await this.applyFamily(fresh.family, fresh.openid, { editingWallTitle: false, wallTitleInput: '' });
       wx.hideLoading();
       wx.showToast({ title: '已保存', icon: 'success' });
     } catch (e) {
@@ -310,11 +319,7 @@ Page({
       const fresh = await getMyFamily();
       app.globalData.family = fresh.family;
       wx.setStorageSync('myFamily', fresh.family);
-      this.setData({
-        ...buildView(fresh.family, fresh.openid),
-        editingNote: false,
-        noteInput: '',
-      });
+      await this.applyFamily(fresh.family, fresh.openid, { editingNote: false, noteInput: '' });
       wx.hideLoading();
       wx.showToast({ title: '已留言', icon: 'success' });
     } catch (e) {
@@ -342,7 +347,7 @@ Page({
           const fresh = await getMyFamily();
           app.globalData.family = fresh.family;
           wx.setStorageSync('myFamily', fresh.family);
-          this.setData(buildView(fresh.family, fresh.openid));
+          await this.applyFamily(fresh.family, fresh.openid);
           wx.hideLoading();
           wx.showToast({ title: '已上传', icon: 'success' });
         } catch (e) {
@@ -353,10 +358,13 @@ Page({
     });
   },
 
+  // 点按预览大图：用临时可访问 URL，保证对方也能打开
   onPreviewPhoto(e) {
-    const urls = this.data.photos;
+    const urls = this.data.photoUrls || [];
+    if (!urls.length) return;
+    const idx = e.currentTarget.dataset.index;
     wx.previewImage({
-      current: e.currentTarget.dataset.url,
+      current: urls[idx] || urls[0],
       urls,
     });
   },
@@ -384,7 +392,7 @@ Page({
       const fresh = await getMyFamily();
       app.globalData.family = fresh.family;
       wx.setStorageSync('myFamily', fresh.family);
-      this.setData(buildView(fresh.family, fresh.openid));
+      await this.applyFamily(fresh.family, fresh.openid);
       wx.hideLoading();
       wx.showToast({ title: becomingCover ? '已设为封面' : '已取消封面', icon: 'none' });
     } catch (e) {
@@ -409,7 +417,7 @@ Page({
           const fresh = await getMyFamily();
           app.globalData.family = fresh.family;
           wx.setStorageSync('myFamily', fresh.family);
-          this.setData(buildView(fresh.family, fresh.openid));
+          await this.applyFamily(fresh.family, fresh.openid);
           wx.hideLoading();
           wx.showToast({ title: '已删除', icon: 'none' });
         } catch (err) {
