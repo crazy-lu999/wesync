@@ -17,6 +17,13 @@
 
   <!-- 有家庭：列表 -->
   <view wx:else class="list-wrap">
+    <!-- 新版本提醒横幅（热启动也能看到） -->
+    <view wx:if="{{showUpdateBanner}}" class="update-banner" bindtap="onRestart2Update" hover-class="update-banner-hover">
+      <text class="update-banner-emoji">🎁</text>
+      <text class="update-banner-text">悄悄话：我藏了个新功能，
+快重启去拆礼物吧 ❤️</text>
+      <text class="update-banner-arrow">›</text>
+    </view>
     <!-- 语义化同步事件提示条 -->
     <view wx:if="{{syncTip}}" class="sync-event-tip">{{syncTip}}</view>
     <view class="topbar">

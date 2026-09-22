@@ -46,10 +46,10 @@
         <text wx:if="{{photos.length}}" class="muted photo-count">{{photos.length}}/{{photoMax}}</text>
       </view>
 
-      <!-- 封面：设了封面后顶部整幅展示 -->
-      <view wx:if="{{cover}}" class="cover-wrap">
-        <image class="cover-img" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewPhoto" data-index="{{coverIndex}}"/>
-        <view class="cover-tag">🌟 封面</view>
+      <!-- 封面：设了封面后顶部整幅展示（长按可取消封面） -->
+      <view wx:if="{{cover}}" class="cover-wrap" bindlongpress="onCoverMenu" hover-class="cell-hover">
+        <image class="cover-img" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover"/>
+        <view class="cover-tag">🌟 封面 · 长按可取消</view>
       </view>
 
       <!-- 空态：居中大占位，点击上传第一张 -->
@@ -58,19 +58,18 @@
         <view class="empty-tip">上传第一张，定格我们的美好时光</view>
       </view>
 
-      <!-- 有照片：网格展示 -->
+      <!-- 有照片：网格展示（封面已在顶部大图展示，小格子不再重复显示） -->
       <view wx:elif="{{photos.length}}" class="photo-grid">
         <view
-          class="photo-cell {{item === cover ? 'covered' : ''}}"
-          wx:for="{{photos}}"
-          wx:key="*this"
-          data-index="{{index}}"
+          class="photo-cell"
+          wx:for="{{gridPhotos}}"
+          wx:key="fileID"
+          data-index="{{item.index}}"
           bindtap="onPreviewPhoto"
           bindlongpress="onPhotoMenu"
           hover-class="cell-hover"
         >
-          <image class="photo-img" src="{{photoUrls[index]}}" mode="aspectFill" lazy-load/>
-          <view wx:if="{{item === cover}}" class="cell-cover-mark">封面</view>
+          <image class="photo-img" src="{{item.url}}" mode="aspectFill" lazy-load/>
         </view>
       </view>
 
@@ -231,7 +230,8 @@
 
     <!-- 反馈列表 -->
     <view wx:if="{{showFeedbackList}}" class="card feedback-list-box">
-      <view wx:if="{{!feedbacks.length}}" class="fb-empty muted">还没有反馈，去首页评论区逛逛吧～</view>
+      <view wx:if="{{feedbackLoading}}" class="fb-loading muted">加载中…</view>
+      <view wx:elif="{{!feedbacks.length}}" class="fb-empty muted">还没有反馈，去首页评论区逛逛吧～</view>
       <view
         wx:for="{{feedbacks}}"
         wx:key="id"

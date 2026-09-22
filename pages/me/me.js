@@ -18,6 +18,13 @@ function buildView(family, openid) {
   const photoUrls = family && Array.isArray(family.photoUrls) ? family.photoUrls : photos.slice();
   const cover = (family && family.cover) || '';
   const coverUrl = cover ? ((family && family.coverUrl) || cover) : '';
+  const coverSource = (family && family.coverSource) || ''; // 裁剪封面的来源原图（重新裁剪用）
+  // 网格展示清单：排除封面（封面在顶部大图展示，小格子不重复显示同一张）。
+  // 每项保留它在 photos 里的原始下标 index，供预览/菜单正确定位 photoUrls / photos。
+  const gridPhotos = [];
+  photos.forEach((f, i) => {
+    if (f !== cover) gridPhotos.push({ fileID: f, url: photoUrls[i], index: i });
+  });
   const note = (family && family.note) || null;
   return {
     family: family || null,
@@ -26,8 +33,10 @@ function buildView(family, openid) {
     members,
     photos,
     photoUrls,
+    gridPhotos,
     cover,
     coverUrl,
+    coverSource,
     coverIndex: cover ? photos.indexOf(cover) : -1,
     photoWallTitle: ((family && family.wallTitle) || '').trim() || config.PHOTO_WALL_TITLE,
     photoMax: 9,
@@ -52,8 +61,10 @@ Page({
     members: [],
     photos: [], // 云存储 fileID 列表
     photoUrls: [], // 与 photos 一一对应的临时可访问 URL（对方也能看图）
+    gridPhotos: [], // 网格展示用：排除封面后的照片（含原始下标）
     cover: '', // 封面 fileID
     coverUrl: '', // 封面临时可访问 URL
+    coverSource: '', // 裁剪封面的来源原图 fileID
     coverIndex: -1,
     photoMax: 9,
     photoWallTitle: config.PHOTO_WALL_TITLE,
@@ -72,6 +83,7 @@ Page({
     feedbackMax: config.FEEDBACK_MAX_LEN,
     // 反馈管理
     showFeedbackList: false,
+    feedbackLoading: false,
     feedbacks: [],
     feedbackUnread: 0,
     adminOpenid: config.ADMIN_OPENID,
@@ -237,15 +249,20 @@ Page({
     if (willShow) await this.loadFeedbacks();
   },
 
+  async onFeedbackManage() {
+    const willShow = !this.data.showFeedbackList;
+    // 先置加载态：数据没回来前不要显示“空态”，避免误报“没有反馈”
+    this.setData({ showFeedbackList: willShow, feedbackLoading: willShow, feedbacks: [] });
+    if (willShow) await this.loadFeedbacks();
+  },
+
   async loadFeedbacks() {
-    wx.showLoading({ title: '加载中' });
     try {
       const d = await listFeedbacks();
       const feedbacks = (d.list || []).map((it) => ({ ...it, timeText: fmtTime(it.createdAt) }));
-      this.setData({ feedbacks, feedbackUnread: d.unread || 0 });
-      wx.hideLoading();
+      this.setData({ feedbacks, feedbackUnread: d.unread || 0, feedbackLoading: false });
     } catch (e) {
-      wx.hideLoading();
+      this.setData({ feedbackLoading: false });
       wx.showToast({ title: e.message || '加载失败', icon: 'none' });
     }
   },
@@ -358,6 +375,13 @@ Page({
     });
   },
 
+  // 点按封面大图预览（封面可能是独立裁剪出的小图，单独用 coverUrl 预览）
+  onPreviewCover() {
+    const u = this.data.coverUrl;
+    if (!u) return;
+    wx.previewImage({ current: u, urls: [u] });
+  },
+
   // 点按预览大图：用临时可访问 URL，保证对方也能打开
   onPreviewPhoto(e) {
     const urls = this.data.photoUrls || [];
@@ -369,20 +393,86 @@ Page({
     });
   },
 
-  // 长按照片弹二级菜单：设封面 / 删除
+  // 长按照片弹二级菜单：设为封面(可裁剪) / 删除
   onPhotoMenu(e) {
     const idx = e.currentTarget.dataset.index;
     const url = this.data.photos[idx];
     if (!url) return;
-    const isCover = url === this.data.cover;
-    const items = [isCover ? '🌙 取消封面' : '🌟 设为封面', '🗑️ 删除照片'];
+    const items = ['🌠 设为封面（可裁剪）', '🗑️ 删除照片'];
     wx.showActionSheet({
       itemList: items,
       success: (res) => {
-        if (res.tapIndex === 0) this.setCoverPhoto(!isCover ? url : '', !isCover);
+        if (res.tapIndex === 0) this.startCropCover(url); // 设为封面时进入裁剪
         else if (res.tapIndex === 1) this.confirmDeletePhoto(idx);
       },
     });
+  },
+
+  // 长按封面大图：取消封面 / 重新裁剪
+  onCoverMenu() {
+    if (!this.data.cover) return;
+    wx.showActionSheet({
+      itemList: ['🎨 重新裁剪封面', '🌙 取消封面'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          // 优先用来源原图重剪（质量最优、可重选原图任意区域）；老数据无来源时回退用旧封面
+          const src = this.data.coverSource || this.data.cover;
+          this.startCropCover(src, true);
+        } else if (res.tapIndex === 1) this.setCoverPhoto('', false);
+      },
+    });
+  },
+
+  // 设为封面：下载原图 → 弹系统裁剪框让用户框选显示区域 → 上传裁剪图 → 设为封面
+  // sourceFileID: 来源原图（填入 coverSource 供重新裁剪回原图）；isReCrop: 是否为重新裁剪
+  async startCropCover(sourceFileID, isReCrop = false) {
+    // 兜底：老基础库不支持裁剪时，直接整张设为封面
+    if (!wx.canIUse('cropImage') || !wx.cropImage) {
+      this.setCoverPhoto(sourceFileID, true);
+      return;
+    }
+    wx.showLoading({ title: '加载原图…', mask: true });
+    try {
+      const dl = await wx.cloud.downloadFile({ fileID: sourceFileID });
+      const src = dl.tempFilePath;
+      wx.hideLoading();
+      wx.cropImage({
+        src, // 本地图片路径
+        cropWidth: 1600,   // 输出宽度（封面用途，够清晰即可）
+        cropHeight: 1200,  // 输出高度
+        success: async (res) => {
+          const cropPath = res.tempFilePath;
+          if (!cropPath) { this.setCoverPhoto(sourceFileID, true); return; }
+          const ext = (cropPath.match(/\.[a-zA-Z0-9]+$/) || ['.jpg'])[0];
+          const cloudPath = `covers/${this.data.myOpenid}/${Date.now()}${ext}`;
+          wx.showLoading({ title: '上传封面…', mask: true });
+          try {
+            const up = await wx.cloud.uploadFile({ cloudPath, filePath: cropPath });
+            // 传 source=来源原图，云函数记录 coverSource，供下次重新裁剪回原图
+            const fresh = await setCover(up.fileID, sourceFileID).then(() => getMyFamily());
+            app.globalData.family = fresh.family;
+            wx.setStorageSync('myFamily', fresh.family);
+            await this.applyFamily(fresh.family, fresh.openid);
+            wx.hideLoading();
+            wx.showToast({ title: '封面已设置', icon: 'success' });
+          } catch (e) {
+            wx.hideLoading();
+            // 上传/保存失败时回退：直接用原图当封面，不丢功能
+            this.setCoverPhoto(sourceFileID, true);
+            wx.showToast({ title: '裁剪保存失败，已改用原图', icon: 'none' });
+          }
+        },
+        fail: (err) => {
+          // 用户取消裁剪：不处理
+          if (err && err.errMsg && /cancel/i.test(err.errMsg)) return;
+          wx.showToast({ title: '裁剪已取消', icon: 'none' });
+        },
+      });
+    } catch (e) {
+      wx.hideLoading();
+      this.setCoverPhoto(fileID, true); // 下载失败也回退为原图封面
+      wx.showToast({ title: '加载原图失败，已改用原图', icon: 'none' });
+    }
   },
 
   async setCoverPhoto(fileID, becomingCover) {

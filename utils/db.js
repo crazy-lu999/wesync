@@ -31,7 +31,7 @@ const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos',
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
 const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
 const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
-const setCover = (fileID) => call('updateFamily', { action: 'setCover', fileID });
+const setCover = (fileID, source) => call('updateFamily', { action: 'setCover', fileID, source });
 // 悄悄话留言墙
 const setNote = (text) => call('updateFamily', { action: 'setNote', text });
 

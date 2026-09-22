@@ -71,11 +71,30 @@ exports.main = async (event) => {
   // —— 设/取消封面 ——
   if (action === 'setCover') {
     const fileID = event.fileID || '';
+    // coverSource：裁剪封面的来源原图 fileID（供“重新裁剪”时回原图，而非在裁过的图上二次裁剪）
+    const source = event.source || (fileID && (fam.photos || []).includes(fileID) ? fileID : '');
+    const data = { cover: fileID };
     if (fileID) {
       const photos = fam.photos || [];
-      if (!photos.includes(fileID)) return { code: -1, message: '仅可设为已有照片' };
+      // 封面允许两种：相片墙里已有的照片，或裁剪后的独立封面文件(covers/… 由前端 wx.cropImage 生成上传)
+      const isCropCover = typeof fileID === 'string' && fileID.indexOf('covers/') !== -1;
+      if (!photos.includes(fileID) && !isCropCover) return { code: -1, message: '仅可设为已有照片' };
+      // 整图封面：来源即它自己；裁剪封面：来源为传入的 source（为空则回退为旧 coverSource 或空）
+      data.coverSource = !isCropCover ? fileID : (source || (fam.coverSource || ''));
+    } else {
+      data.coverSource = ''; // 取消封面时一并清来源
     }
-    await famRef.update({ data: { cover: fileID } });
+    await famRef.update({ data });
+    // 主动清理旧封面孤儿文件：只删“裁剪产生的封面(covers/…)”且不再是当前封面/照片墙引用的
+    const oldCover = (fam.cover || '');
+    const isHiddenCropCover =
+      oldCover &&
+      oldCover.indexOf('covers/') !== -1 &&
+      oldCover !== fileID &&
+      !(fam.photos || []).includes(oldCover);
+    if (isHiddenCropCover) {
+      try { await cloud.deleteFile({ fileList: [oldCover] }); } catch (e) { console.error(e); }
+    }
     return { code: 0, message: 'ok', data: { cover: fileID, photos: fam.photos || [] } };
   }
 

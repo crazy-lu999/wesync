@@ -57,6 +57,7 @@ Page({
     doneCount: 0,
     totalDone: 0, // 你们一起累计完成的件数（里程碑）
     syncTip: '', // 语义化同步提示（TA 刚完成了…）
+    showUpdateBanner: false, // 有新版本时显示顶部横幅
     templates: config.TODO_TEMPLATES,
     inputDeadline: '', // 新建/编辑时标记的一次性截止日期 YYYY-MM-DD
     inputDeadlineText: '', // 同上的倒计时文案（如 8月5日 · 还有 3 天）
@@ -75,6 +76,8 @@ Page({
   },
 
   onShow() {
+    // 每次回到首页都检查一次（热启动也触发），发现新版本即显示顶部横幅
+    this.checkLatestVersion();
     // 从 create/join 返回时刷新家庭
     if (app.globalData.family !== this.data.family) {
       this.loadFamily();
@@ -93,6 +96,52 @@ Page({
 
   onLoad() {
     this.loadFamily();
+  },
+
+  // 判断是否有新版本：读 app.onCheckForUpdate 自动写入的全局标记（热启动也能看到）
+  // 双保险判断是否有新版本，热启动也能看到：
+  //  ① wx.getUpdateManager 自动判断（onCheckForUpdate 写入 globalData.hasUpdate）——零维护，主治常规；
+  //  ② 兜底：查 app_config 最新版本号对比本地 APP_VERSION——每次 onShow 无条件校验，
+  //     覆盖“从旧版一直挂后台、期间发版、从不重新冷启动”这类 hasUpdate 可能没点亮的极端场景。
+  checkLatestVersion() {
+    if (this._versionChecked) return;    // onShow 可能多次触发，一次会话内只查一轮（含云函数兜底）
+    // 若冷启动已弹升级弹窗（onUpdateReady），首页横幅让位，避免重复提醒
+    if (app.globalData.updateDialogShown) { this._versionChecked = true; return; }
+    // 先走自动判断：注册/读取 onCheckForUpdate，微信检测到新版 → 点亮 hasUpdate 并显示
+    if (wx.getUpdateManager) {
+      try {
+        wx.getUpdateManager().onCheckForUpdate((res) => {
+          if (res && res.hasUpdate) { app.globalData.hasUpdate = true; this.setData({ showUpdateBanner: true }); }
+        });
+      } catch (e) { /* ignore */ }
+    }
+    // 铁桶兜底：无条件查一次 app_config，杜绝极端热启动漏显示
+    this._versionChecked = true;
+    wx.cloud
+      .callFunction({ name: 'getLatestVersion' })
+      .then((r) => {
+        const latest = (r && r.result && r.result.data && r.result.data.version) || '';
+        if (latest && latest !== config.APP_VERSION) {
+          app.globalData.hasUpdate = true;
+          this.setData({ showUpdateBanner: true });
+        }
+      })
+      .catch((e) => console.warn('[update] 版本兜底检查失败', e));
+  },
+
+  // 点横幅重启升级
+  onRestart2Update() {
+    wx.showModal({
+      title: '悄悄话：有更新啦 🎁',
+      content: '我偷偷塞了个新功能进来，\n重启一下就能用上咯～',
+      showCancel: false,
+      confirmText: '去拆礼物',
+      success: (res) => {
+        if (!res.confirm) return;
+        const um = wx.getUpdateManager ? wx.getUpdateManager() : null;
+        if (um) um.applyUpdate();
+      },
+    });
   },
 
   async loadFamily() {

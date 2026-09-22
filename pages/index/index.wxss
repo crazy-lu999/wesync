@@ -92,6 +92,19 @@
   filter: drop-shadow(0 10rpx 18rpx rgba(80, 40, 20, 0.12));
 }
 
+/* 新版本提醒横幅 */
+.update-banner {
+  display: flex; align-items: center; gap: 14rpx;
+  background: linear-gradient(135deg, #FFB24D, #FF7A59); color: #fff;
+  margin: 16rpx 24rpx 0; padding: 22rpx 28rpx;
+  border-radius: 20rpx; box-shadow: 0 10rpx 24rpx rgba(255, 122, 89, 0.32);
+  animation: tipIn 0.3s ease;
+}
+.update-banner-emoji { font-size: 32rpx; }
+.update-banner-text { flex: 1; font-size: 28rpx; font-weight: 600; line-height: 1.4; }
+.update-banner-arrow { font-size: 36rpx; font-weight: 600; opacity: 0.9; }
+.update-banner-hover { opacity: 0.88; }
+
 /* 顶部语义化同步事件提示条 */
 .sync-event-tip {
   position: sticky; top: 0; z-index: 20;
