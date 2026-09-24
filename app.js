@@ -25,6 +25,9 @@ App({
     });
 
     updateManager.onUpdateReady(() => {
+      // 新版已下载完成，可以应用
+      this.globalData.hasUpdate = true;
+      this.globalData.updateReady = true;
       // 已用弹窗提醒：打个全局标记，首页横幅据此让位，避免弹窗+横幅重复提醒
       this.globalData.updateDialogShown = true;
       wx.showModal({
@@ -48,6 +51,7 @@ App({
     openid: null,
     family: null, // { _id, name, inviteCode, members, memberNicks, ... }
     hasUpdate: false, // 线上是否有新版本（由 onCheckForUpdate 自动写入）
+    updateReady: false, // 新版本是否已下载完成（由 onUpdateReady 自动写入）
     updateDialogShown: false, // 热启动已弹窗提醒一张卡，首页横幅据此让位不重复
   },
 });

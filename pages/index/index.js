@@ -6,6 +6,30 @@ const app = getApp();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 版本号字符串 "1.2.3" → [1,2,3]；非数字片段按 0 处理
+function parseVersion(v) {
+  return String(v == null || v === '' ? '0' : v)
+    .split('.')
+    .map((s) => parseInt(s, 10) || 0);
+}
+// 方向化比较：仅当「远端(server) 严格比本地(local) 新」时返回 true。
+// 相等或本地更新都视为无需提醒，避免升级到最新后横幅残留。
+function isNewerVersion(server, local) {
+  const a = parseVersion(server);
+  const b = parseVersion(local);
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false; // 版本号相等
+}
+
+// 冷/热启动回首页重新做一次「远端版本校验」的最小间隔（毫秒）。
+// 只在较短时间内连续 onShow 时防抖，避免打爆云函数；
+// 但保证每次真正意义上的热启动(间隔超过该值)都会重新判定，能感知挂后台期间的新发版。
+const UPDATE_CHECK_GAP = 30 * 1000;
+
 // 今天（本地日期，YYYY-MM-DD），用于日期选择的 start 下限，禁止选过去的日子
 const todayStr = (() => {
   const n = new Date();
@@ -76,7 +100,7 @@ Page({
   },
 
   onShow() {
-    // 每次回到首页都检查一次（热启动也触发），发现新版本即显示顶部横幅
+    // 每次回到首页都检查一次（冷启动 & 热启动都能感知新版），发现新版本即显示顶部横幅
     this.checkLatestVersion();
     // 从 create/join 返回时刷新家庭
     if (app.globalData.family !== this.data.family) {
@@ -98,50 +122,89 @@ Page({
     this.loadFamily();
   },
 
-  // 判断是否有新版本：读 app.onCheckForUpdate 自动写入的全局标记（热启动也能看到）
-  // 双保险判断是否有新版本，热启动也能看到：
-  //  ① wx.getUpdateManager 自动判断（onCheckForUpdate 写入 globalData.hasUpdate）——零维护，主治常规；
-  //  ② 兜底：查 app_config 最新版本号对比本地 APP_VERSION——每次 onShow 无条件校验，
-  //     覆盖“从旧版一直挂后台、期间发版、从不重新冷启动”这类 hasUpdate 可能没点亮的极端场景。
+  // 判断是否有新版本。冷启动 & 热启动都会走这里，双保险：
+  //  ① wx.getUpdateManager 自动判断（app.js 只注册一次，结果写 globalData.hasUpdate）——主治常规；
+  //  ② 兜底：查 app_config 最新版本号，用「远端确实比本地新」做方向化比较——覆盖“从旧版一直挂后台、
+  //     期间发版、从不重新冷启动”这类 hasUpdate 可能没点亮的热启动极端场景。
   checkLatestVersion() {
-    if (this._versionChecked) return;    // onShow 可能多次触发，一次会话内只查一轮（含云函数兜底）
-    // 若冷启动已弹升级弹窗（onUpdateReady），首页横幅让位，避免重复提醒
-    if (app.globalData.updateDialogShown) { this._versionChecked = true; return; }
-    // 先走自动判断：注册/读取 onCheckForUpdate，微信检测到新版 → 点亮 hasUpdate 并显示
-    if (wx.getUpdateManager) {
-      try {
-        wx.getUpdateManager().onCheckForUpdate((res) => {
-          if (res && res.hasUpdate) { app.globalData.hasUpdate = true; this.setData({ showUpdateBanner: true }); }
-        });
-      } catch (e) { /* ignore */ }
+    // 若冷启动已弹过升级弹窗（onUpdateReady），首页横幅让位，避免重复提醒
+    if (app.globalData.updateDialogShown) {
+      this.setData({ showUpdateBanner: false });
+      return;
     }
-    // 铁桶兜底：无条件查一次 app_config，杜绝极端热启动漏显示
-    this._versionChecked = true;
+    // 铁桶兜底：按 UPDATE_CHECK_GAP 防抖地查一次云配置。
+    // 不用一次性 _versionChecked，保证每次热启动(超过间隔)都能重新判定新发版。
+    const now = Date.now();
+    if (!this._cfCheckAt || now - this._cfCheckAt >= UPDATE_CHECK_GAP) {
+      this._cfCheckAt = now;
+      this.checkLatestVersionRemote();
+    }
+    // 即时同步 getUpdateManager 的判定结果（冷/热启动都反映）
+    this.setData({ showUpdateBanner: !!app.globalData.hasUpdate });
+  },
+
+  // 云函数兜底校验：只把「远端比本地新」视为有新版；
+  // 本地已升级到最新时主动收起横幅，避免“版本升级完横幅还在”的残留。
+  checkLatestVersionRemote() {
     wx.cloud
       .callFunction({ name: 'getLatestVersion' })
       .then((r) => {
         const latest = (r && r.result && r.result.data && r.result.data.version) || '';
-        if (latest && latest !== config.APP_VERSION) {
-          app.globalData.hasUpdate = true;
-          this.setData({ showUpdateBanner: true });
-        }
+        const newer = isNewerVersion(latest, config.APP_VERSION);
+        // 任一来源判定有新版即视为有新版；都不满足则收起横幅
+        app.globalData.hasUpdate = !!app.globalData.hasUpdate || newer;
+        this.setData({ showUpdateBanner: !!app.globalData.hasUpdate });
       })
       .catch((e) => console.warn('[update] 版本兜底检查失败', e));
   },
 
-  // 点横幅重启升级
+  // 点横幅：二级菜单引导更新。
+  // 微信没有“当场重启”，更新只在「下次冷启动」生效；
+  // 所以点横幅先给用户选择，选了更新后再按“新版是否已下载完成”拆分两种反馈。
   onRestart2Update() {
-    wx.showModal({
-      title: '悄悄话：有更新啦 🎁',
-      content: '我偷偷塞了个新功能进来，\n重启一下就能用上咯～',
-      showCancel: false,
-      confirmText: '去拆礼物',
+    wx.showActionSheet({
+      itemList: ['🎁 去更新（退出后生效）', '稍后再说'],
       success: (res) => {
-        if (!res.confirm) return;
-        const um = wx.getUpdateManager ? wx.getUpdateManager() : null;
-        if (um) um.applyUpdate();
+        if (res.tapIndex !== 0) return; // 0 = 去更新
+        this.doUpdateNow();
       },
+      fail: () => { /* 用户取消，不处理 */ },
     });
+  },
+
+  // 真正执行更新：按“新版是否已下载完成”给两种诚实反馈。
+  doUpdateNow() {
+    const ready = !!app.globalData.updateReady; // app.js 在 onUpdateReady 时置 true
+    const um = wx.getUpdateManager ? wx.getUpdateManager() : null;
+
+    // 无论下载好没，先 applyUpdate 让微信记下“下次冷启动用新版”（若下载中它稍后也会生效）
+    if (um) {
+      try { um.applyUpdate(); } catch (e) { /* ignore */ }
+    }
+
+    if (ready) {
+      // 新版已下载完成：自动帮用户退出小程序 → 用户重进即冷启动 → 新版生效
+      wx.showModal({
+        title: '新版就绪 🎁',
+        content: '新版已经下载好啦，\n点“确定”我会帮你退出小程序，\n重新打开就是最新版啦 ❤️',
+        showCancel: false,
+        confirmText: '好，帮我退出',
+        success: () => {
+          // 真正退出（不是返回键），重进即冷启动应用新版
+          if (wx.exitMiniProgram) {
+            try { wx.exitMiniProgram({}); } catch (e) { /* ignore */ }
+          }
+        },
+      });
+    } else {
+      // 新版还在下载：这时硬退出去也看不到新版，如实引导
+      wx.showModal({
+        title: '新版还在路上 🚚',
+        content: '等下载好后，先退出小程序，\n去微信「最近使用」列表把它划掉，\n下次进入就会自动用上新版啦～',
+        showCancel: false,
+        confirmText: '好嘞',
+      });
+    }
   },
 
   async loadFamily() {
