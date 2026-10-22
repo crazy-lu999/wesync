@@ -7,6 +7,7 @@
   </view>
 
   <view class="form card">
+    <view wx:if="{{preFilled}}" class="prefill-tip">🎉 已带入 TA 的邀请码，起个昵称就能加入啦</view>
     <view class="field">
       <view class="label">邀请码（6 位数字）</view>
       <input
@@ -28,6 +29,7 @@
           class="input-line"
           data-field="myNick"
           value="{{myNick}}"
+          focus="{{preFilled}}"
           bindinput="onInput"
           placeholder="比如：老公 / 老婆"
           maxlength="10"

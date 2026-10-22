@@ -27,6 +27,18 @@ exports.main = async () => {
   const res = await db.collection('families').where({ members: OPENID }).limit(1).get();
   const family = res.data.length ? res.data[0] : null;
   if (family) {
+    // 兼容老数据：单值 anniversary → 迁移为 anniversaries 列表并落库一次
+    if (!Array.isArray(family.anniversaries) || !family.anniversaries.length) {
+      const legacy = family.anniversary;
+      family.anniversaries = legacy
+        ? [{ id: 'legacy-1', title: '我们的纪念日', date: String(legacy) }]
+        : [];
+      if (legacy) {
+        try {
+          await db.collection('families').doc(family._id).update({ data: { anniversaries: family.anniversaries } });
+        } catch (e) { console.error('[getMyFamily] migrate anniversary failed', e); }
+      }
+    }
     const photos = family.photos || [];
     const cover = family.cover || '';
     const urlMap = await resolvePhotoUrls(photos);

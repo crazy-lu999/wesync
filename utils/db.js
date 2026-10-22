@@ -32,12 +32,14 @@ const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhot
 const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
 const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
 const setCover = (fileID, source) => call('updateFamily', { action: 'setCover', fileID, source });
-// 悄悄话留言墙
-const setNote = (text) => call('updateFamily', { action: 'setNote', text });
+// 纪念日（可多个，各含标题+日期）：新增 / 编辑 / 删除
+const addAnniversary = (id, title, date) => call('updateFamily', { action: 'addAnniversary', id, title, date });
+const editAnniversary = (id, title, date) => call('updateFamily', { action: 'editAnniversary', id, title, date });
+const removeAnniversary = (id) => call('updateFamily', { action: 'removeAnniversary', id });
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
-async function addTodo(familyId, content, openid, creatorNick, deadline) {
+async function addTodo(familyId, content, openid, creatorNick, deadline, assignee) {
   await call('todoOps', {
     action: 'add',
     familyId,
@@ -45,6 +47,7 @@ async function addTodo(familyId, content, openid, creatorNick, deadline) {
     openid,
     creatorNick: creatorNick || '我',
     deadline: deadline || '',
+    assignee: assignee || '',
   });
 }
 
@@ -70,6 +73,9 @@ async function removeTodo(id) {
 async function editTodo(id, content, deadline) {
   await call('todoOps', { action: 'edit', id, content, deadline: deadline || '' });
 }
+
+// 指派/取消指派待办给某成员（openid，空串=两人一起）
+const assignTodo = (id, assignee) => call('todoOps', { action: 'assign', id, assignee: assignee || '' });
 
 // 服务端读当前家庭待办（绕过脆弱的客户端 read 规则，稳定可靠）
 const getMyTodos = () => call('getMyTodos', {});
@@ -112,10 +118,13 @@ module.exports = {
   renameFamily,
   setWallTitle,
   setCover,
-  setNote,
+  addAnniversary,
+  editAnniversary,
+  removeAnniversary,
   addTodo,
   toggleTodo,
   setImportant,
+  assignTodo,
   clearDoneTodos,
   editTodo,
   removeTodo,

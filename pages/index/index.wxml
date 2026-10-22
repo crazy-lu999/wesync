@@ -20,32 +20,30 @@
     <!-- 新版本提醒横幅（热启动也能看到） -->
     <view wx:if="{{showUpdateBanner}}" class="update-banner" bindtap="onRestart2Update" hover-class="update-banner-hover">
       <text class="update-banner-emoji">🎁</text>
-      <text class="update-banner-text">悄悄话：我藏了个新功能，
+      <text class="update-banner-text">我藏了个新功能，
 快重启去拆礼物吧 ❤️</text>
       <text class="update-banner-arrow">›</text>
     </view>
     <!-- 语义化同步事件提示条 -->
     <view wx:if="{{syncTip}}" class="sync-event-tip">{{syncTip}}</view>
-    <view class="topbar">
-      <view wx:if="{{editingFamName}}" class="family-name fam-editing">
-        <view class="fam-dot">🏠</view>
-        <input
-          class="fam-name-input"
-          value="{{famNameInput}}"
-          focus
-          maxlength="20"
-          bindinput="onFamNameInput"
-          bindconfirm="onSaveFamName"
-          placeholder="给家起个名"
-        />
-        <view class="fam-name-actions">
-          <view class="fam-action-cancel" bindtap="onCancelFamName">取消</view>
-          <view class="fam-action-save" bindtap="onSaveFamName">保存</view>
-        </view>
+
+    <!-- 离线/云端异常：本地缓存兜底提示，点击重试 -->
+    <view wx:if="{{offline}}" class="offline-banner" bindtap="onRetryLoad" hover-class="offline-banner-hover">
+      <text class="offline-emoji">⚠️</text>
+      <text class="offline-text">网络开小差，以下为本地缓存。点我重试</text>
+      <text class="offline-arrow">↻</text>
+    </view>
+
+    <!-- 亲密卡：每天一句窝心话 + 纪念日；右上角是「我的」入口（不占独立行） -->
+    <view class="warm-card">
+      <view class="warm-art">
+        <view class="warm-bubble">💌</view>
       </view>
-      <view wx:else class="family-name" bindlongpress="onEditFamName" hover-class="fam-hover">
-        <view class="fam-dot">🏠</view>
-        <text>{{family.name}}</text>
+      <view class="warm-body">
+        <view class="warm-phrase">{{dailyPhrase}}</view>
+        <!-- 倒计时：距离 X 还有 N 天 -->
+        <view wx:if="{{annivInfo.nextLabel}}" class="warm-next-line">💍 {{annivInfo.nextLabel}}</view>
+        <view wx:else class="warm-next-line link" bindtap="goMe">记下纪念日 🤍</view>
       </view>
       <view class="me-btn" bindtap="goMe">
         <text>我的</text>
@@ -66,7 +64,7 @@
     </view>
 
     <view class="stat-sub">
-      <text class="stat-total">🎯 你们一起完成了 {{totalDone}} 件</text>
+      <text class="stat-total">🎯 共完成 {{totalDone}} 件 · 本周 {{weeklyDone}} 件</text>
       <text wx:if="{{doneCount}}" class="clear-done" bindtap="onClearDone">清空已完成</text>
     </view>
 
@@ -110,6 +108,7 @@
           </view>
           <view class="todo-meta">
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
+            <text wx:if="{{item.assignee}}" class="assign-tag {{item.assignToMe ? 'mine' : ''}}">👤 {{item.assignNick}}</text>
             <text wx:if="{{item.done}}" class="meta-done">✓ {{item.doneNick || '已完成'}}</text>
             <text class="muted">{{item.done && item.doneTimeText ? item.doneTimeText : item.timeText}}</text>
             <!-- 截止日期倒计时徽标（跟在创建人/时间后面） -->
@@ -199,6 +198,8 @@
             <text wx:else>⏰ 倒计时</text>
           </view>
         </picker>
+        <!-- 新建态：指派给谁 chip -->
+        <view wx:if="{{inputVal}}" class="assign-chip {{assignFor ? 'set' : ''}}" bindtap="onPickAssign" hover-class="assign-hover">{{assignForText}}</view>
         <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
       </view>
     </block>

@@ -1,5 +1,6 @@
 // pages/create/create.js
 const { createFamily } = require('../../utils/db.js');
+const { buildShare } = require('../../utils/share.js');
 const app = getApp();
 
 Page({
@@ -43,5 +44,14 @@ Page({
   backHome() {
     // 重新拉取家庭并回到首页
     wx.reLaunch({ url: '/pages/index/index' });
+  },
+
+  // 转发给朋友：统一品牌卡，引导新用户建自己的小家（分享诉求只有拉新家庭）
+  onShareAppMessage() {
+    return buildShare();
+  },
+
+  onShareTimeline() {
+    return buildShare();
   },
 });

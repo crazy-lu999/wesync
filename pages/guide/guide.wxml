@@ -23,5 +23,6 @@
   </view>
 
   <view class="foot muted">愿每一件小事，都被温柔记下 💛</view>
+  <button class="btn-primary share-guide" open-type="share">💌 把这个小本本送给在乎的人</button>
   <view class="ver muted">wesync共享笔记 · 版本 {{version}}</view>
 </view>

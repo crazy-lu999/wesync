@@ -1,6 +1,37 @@
 /* pages/me/me.wxss */
 .page { padding-top: 40rpx; padding-bottom: 220rpx; }
 
+/* 家庭名卡 */
+.fam-name-row {
+  display: flex; align-items: center; gap: 20rpx;
+  padding: 8rpx 4rpx;
+}
+.fam-name-icon {
+  flex: none; width: 76rpx; height: 76rpx; border-radius: 22rpx;
+  background: linear-gradient(135deg, #FF6F5E, #FF917A);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40rpx; box-shadow: 0 8rpx 18rpx rgba(255, 111, 94, 0.3);
+}
+.fam-name-text { flex: 1; min-width: 0; }
+.fam-name-label { font-size: 22rpx; }
+.fam-name-value { font-size: 34rpx; font-weight: 800; color: #2A2626; }
+.fam-edit-chip {
+  flex: none; color: #FF6F5E; font-size: 26rpx; font-weight: 600;
+  background: #FFF3F0; padding: 10rpx 22rpx; border-radius: 999rpx;
+}
+.fam-name-form { margin-top: 8rpx; }
+.fam-name-input {
+  height: 64rpx; line-height: 64rpx; padding: 0 20rpx;
+  border: 2rpx solid rgba(255, 111, 94, 0.4); border-radius: 12rpx;
+  background: #FFF6F3; font-size: 30rpx; font-weight: 600; color: #2A2626;
+  box-sizing: border-box; width: 100%;
+}
+.fam-name-form-actions {
+  display: flex; justify-content: flex-end; align-items: center; gap: 20rpx;
+  margin-top: 16rpx;
+}
+.fam-cancel { font-size: 26rpx; padding: 6rpx 8rpx; }
+
 /* 相片墙标题：点击可改名 */
 .wall-title-tap {
   display: flex; align-items: center; gap: 10rpx;
@@ -92,19 +123,41 @@
 .add-btn-plus { font-size: 34rpx; line-height: 1; font-weight: 600; }
 .add-btn-text { font-size: 28rpx; font-weight: 600; }
 
-/* 悄悄话留言墙 */
-.note-bubble {
-  background: #FFF3F0; border-radius: 20rpx;
-  padding: 26rpx 28rpx; font-size: 30rpx; line-height: 1.6;
-  color: #4A3F3B; margin-top: 8rpx;
-  border: 1rpx solid #FFE0D8;
-}
-.note-meta { margin-top: 12rpx; font-size: 24rpx; text-align: right; }
+/* 纪念日空态 / 占位提示（通用） */
 .note-empty {
   padding: 28rpx 0; text-align: center;
   font-size: 26rpx; color: #B8B2AF; background: #FAF7F6;
   border-radius: 18rpx; margin-top: 8rpx;
 }
+
+/* 纪念日卡 */
+.anniv-list { display: flex; flex-direction: column; gap: 16rpx; }
+.anniv-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22rpx 26rpx;
+  background: linear-gradient(135deg, #FFF3F0, #FFE8E2);
+  border: 1rpx solid rgba(255, 124, 96, 0.16);
+  border-radius: 18rpx;
+}
+.anniv-item-left { min-width: 0; }
+.anniv-item-title { font-size: 30rpx; font-weight: 700; color: #FF6F5E; word-break: break-all; }
+.anniv-item-date { margin-top: 6rpx; font-size: 23rpx; }
+.anniv-edit-chip {
+  flex: none; margin-left: 16rpx;
+  width: 56rpx; height: 56rpx; border-radius: 50%;
+  background: rgba(255, 111, 94, 0.12); color: #FF6F5E;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28rpx;
+}
+.anniv-form { display: flex; flex-direction: column; gap: 16rpx; }
+.anniv-form .form-title { width: 100%; box-sizing: border-box; }
+.anniv-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16rpx; }
+.del-btn { background: #FFF0EE; color: #F0413B; }
+.picker-display {
+  display: flex; align-items: center;
+  width: 100%; box-sizing: border-box;
+}
+
 
 /* 家庭名牌卡 */
 .profile {
@@ -133,6 +186,7 @@
 .invite-card .row {
   display: flex; align-items: center; justify-content: space-between;
 }
+.share-invite { margin-top: 20rpx; }
 .code-val { display: flex; align-items: center; gap: 20rpx; }
 .code {
   font-size: 48rpx; font-weight: 800; color: #FF6F5E; letter-spacing: 10rpx;

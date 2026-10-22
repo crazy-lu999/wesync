@@ -18,6 +18,35 @@
   </block>
 
   <block wx:elif="{{family}}">
+    <!-- 家庭名卡：展示并可重命名（改名从首页挪来） -->
+    <view class="card fam-name-card">
+      <view class="fam-name-row" bindtap="onEditFamName" hover-class="cell-hover">
+        <view class="fam-name-icon">🏠</view>
+        <block wx:if="{{!editingFamName}}">
+          <view class="fam-name-text">
+            <view class="fam-name-label muted">我们的家</view>
+            <view class="fam-name-value">{{family.name}}</view>
+          </view>
+          <text class="fam-edit-chip">✎ 改名</text>
+        </block>
+      </view>
+      <view wx:if="{{editingFamName}}" class="fam-name-form">
+        <input
+          class="fam-name-input"
+          value="{{famNameInput}}"
+          focus
+          maxlength="20"
+          bindinput="onFamNameInput"
+          bindconfirm="onSaveFamName"
+          placeholder="给家起个名"
+        />
+        <view class="fam-name-form-actions">
+          <text class="muted fam-cancel" bindtap="onCancelFamName">取消</text>
+          <text class="save-btn" bindtap="onSaveFamName">保存</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 相片墙卡：自定义上传照片展示（长按删除 / 点按查看） -->
     <view class="card">
       <view class="card-title">
@@ -80,31 +109,52 @@
       </view>
     </view>
 
-    <!-- 悄悄话：给对方留一句话 -->
+    <!-- 纪念日：可加多个，每个带标题，首页倒计时 → 点卡片长期按可删 -->
     <view class="card">
       <view class="card-title">
-        <text class="card-title-icon">💌</text>
-        <text>悄悄话</text>
-        <text wx:if="{{!editingNote}}" class="nick-hint" bindtap="onEditNote" hover-class="cell-hover">写一句</text>
+        <text class="card-title-icon">💗</text>
+        <text>我们的纪念日</text>
+        <text wx:if="{{!editingAnniv}}" class="nick-hint" bindtap="onAddAnniv">＋ 添加</text>
       </view>
-      <view wx:if="{{!editingNote}}">
-        <view wx:if="{{note}}" class="note-bubble">{{note.text}}</view>
-        <view wx:if="{{note}}" class="note-meta muted">—— {{note.nick}}</view>
-        <view wx:else class="note-empty" bindtap="onEditNote" hover-class="cell-hover">还没有留言，给对方写一句悄悄话吧 ✍️</view>
-      </view>
-      <view wx:else class="member-edit-row">
+      <!-- 列表 -->
+      <block wx:if="{{!editingAnniv}}">
+        <view wx:if="{{!annivs.length}}" class="note-empty" bindtap="onAddAnniv" hover-class="cell-hover">还没记录，点这里记下 TA 的好日子 🗓️</view>
+        <view wx:else class="anniv-list">
+          <view
+            wx:for="{{annivs}}"
+            wx:key="id"
+            class="anniv-item"
+            data-id="{{item.id}}"
+            bindtap="onEditAnniv"
+            hover-class="cell-hover"
+          >
+            <view class="anniv-item-left">
+              <view class="anniv-item-title">{{item.title}}</view>
+              <block wx:if="{{item.countdown === 0}}"><view class="anniv-item-date muted">{{item.date}} · 今天 🎉</view></block>
+              <block wx:elif="{{item.countdown > 0}}"><view class="anniv-item-date muted">{{item.date}} · 距离还有 {{item.countdown}} 天</view></block>
+              <block wx:else><view class="anniv-item-date muted">{{item.date}}</view></block>
+            </view>
+            <view class="anniv-edit-chip">✎</view>
+          </view>
+        </view>
+      </block>
+      <!-- 新增/编辑表单 -->
+      <view wx:else class="anniv-form">
         <input
-          class="nick-input"
-          value="{{noteInput}}"
+          class="nick-input form-title"
+          value="{{titleInput}}"
           focus
-          maxlength="100"
-          bindinput="onNoteInput"
-          bindconfirm="onSaveNote"
-          placeholder="把想说的话写在这里…"
+          maxlength="12"
+          placeholder="给纪念日起个名，如：恋爱纪念日"
+          bindinput="onTitleInput"
         />
-        <view class="nick-actions">
-          <view class="copy-btn" bindtap="onCancelNote">取消</view>
-          <view class="save-btn" bindtap="onSaveNote">发送</view>
+        <picker mode="date" value="{{dateInput}}" start="1900-01-01" end="{{today}}" bindchange="onDatePick" style="width:100%">
+          <view class="nick-input picker-display">🗓️ {{dateInput}}</view>
+        </picker>
+        <view class="anniv-actions">
+          <view class="copy-btn" bindtap="onCancelAnniv">取消</view>
+          <view wx:if="{{editingAnnivId}}" class="copy-btn del-btn" bindtap="onDelAnniv">删除</view>
+          <view class="save-btn" bindtap="onSaveAnniv">保存</view>
         </view>
       </view>
     </view>
@@ -122,8 +172,9 @@
           <view class="copy-btn">复制</view>
         </view>
       </view>
+      <button class="btn-primary share-invite" open-type="share">🎁 发卡片给 TA，点开一键加入</button>
       <view wx:if="{{members.length < 2}}" class="muted tip">
-        把上面的邀请码发给 TA 吧
+        或把邀请码复制发给 TA 也行
       </view>
     </view>
 

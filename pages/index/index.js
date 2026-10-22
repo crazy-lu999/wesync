@@ -1,6 +1,7 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, clearDoneTodos, subscribeTodos, renameFamily } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, assignTodo, clearDoneTodos, subscribeTodos } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
+const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -37,6 +38,72 @@ const todayStr = (() => {
   return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
 })();
 
+// —— 每天一句窝心话：按一年中的第几天取一条，整天稳定、两人看到一致 ——
+const WARM = config.WARM_PHRASES || [];
+function dailyWarm() {
+  if (!WARM.length) return '';
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const idx = Math.floor((now - start) / 86400000) % WARM.length;
+  return WARM[idx];
+}
+
+// —— 纪念日（可多个，各含标题+日期）——
+// 归一化家庭里的纪念日为列表（兼容老单值 anniversary）
+function normAnnivs(family) {
+  if (!family) return [];
+  if (Array.isArray(family.anniversaries) && family.anniversaries.length) {
+    return family.anniversaries.map((a) => ({
+      id: a.id,
+      title: ((a.title || '').trim()) || '纪念日',
+      date: String(a.date || ''),
+    }));
+  }
+  if (family.anniversary) return [{ id: 'legacy-1', title: '我们的纪念日', date: String(family.anniversary) }];
+  return [];
+}
+// 距最近一个周年的天数
+function nextAnnivDays(date) {
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(date || ''));
+  if (!m) return null;
+  const mo = +m[2], d = +m[3];
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), mo - 1, d);
+  if (next < today) next.setFullYear(now.getFullYear() + 1);
+  return Math.round((next - today) / 86400000);
+}
+// 聚合：找出最近一场纪念日，拼成「距离 X 还有 N 天」/「今天就是 X 🎉」
+function buildAnnivInfo(family) {
+  const list = normAnnivs(family).filter((a) => a.date);
+  if (!list.length) return { nextLabel: '' };
+  let best = null; // { title, days }
+  list.forEach((a) => {
+    const days = nextAnnivDays(a.date);
+    if (days == null) return;
+    if (!best || days < best.days) best = { title: a.title, days };
+  });
+  if (!best) return { nextLabel: '' };
+  const label = best.days === 0
+    ? `今天就是「${best.title}」🎉`
+    : `距离「${best.title}」还有 ${best.days} 天`;
+  return { nextLabel: label };
+}
+
+// —— 这周（含今天往前 6 天）一起完成的件数，用于“周小结” ——
+function countWeeklyDone(todos) {
+  const now = new Date();
+  const start7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  let n = 0;
+  (todos || []).forEach((t) => {
+    if (!t.done || !t.doneTime) return;
+    const d = new Date(t.doneTime);
+    if (isNaN(d.getTime())) return;
+    if (d >= start7 && d <= now) n++;
+  });
+  return n;
+}
+
 // 一次性截止日期 → 剩余天数可视化信息。返回 null 表示未标记日期。
 function calcDeadline(deadline) {
   if (!deadline) return null;
@@ -66,6 +133,7 @@ function deadlineChipText(deadline) {
 Page({
   data: {
     loading: true,
+    offline: false, // 断网/云端异常时回退本地缓存，并提示可重试
     hasFamily: false,
     family: null,
     myOpenid: '',
@@ -80,6 +148,11 @@ Page({
     activeCount: 0,
     doneCount: 0,
     totalDone: 0, // 你们一起累计完成的件数（里程碑）
+    weeklyDone: 0, // 这周一起完成的件数（周小结）
+    dailyPhrase: '', // 今天的一句窝心话
+    annivInfo: { nextLabel: '' }, // 最近一场纪念日倒计时
+    assignFor: '', // 新建待办指派给谁（openid，空=两人一起）
+    assignForText: '👥 一起', // 底部指派 chip 文案
     syncTip: '', // 语义化同步提示（TA 刚完成了…）
     showUpdateBanner: false, // 有新版本时显示顶部横幅
     templates: config.TODO_TEMPLATES,
@@ -94,9 +167,6 @@ Page({
     // 撒花庆祝
     celebrate: false,
     petals: [],
-    // 家庭名编辑
-    editingFamName: false,
-    famNameInput: '',
   },
 
   onShow() {
@@ -120,6 +190,15 @@ Page({
 
   onLoad() {
     this.loadFamily();
+  },
+
+  // 转发给朋友/朋友圈：统一品牌卡，引导新用户建自己的小家
+  onShareAppMessage() {
+    return buildShare();
+  },
+
+  onShareTimeline() {
+    return buildShare();
   },
 
   // 判断是否有新版本。冷启动 & 热启动都会走这里，双保险：
@@ -217,21 +296,47 @@ Page({
 
       if (family) {
         const myNick = (family.memberNicks && family.memberNicks[openid]) || '我';
+        // 亲密区：纪念日天数 + 每日窝心话
+        const annivInfo = buildAnnivInfo(family);
         // 先用本地缓存立即可见，避免等云函数返回时空白（首屏秒显）
         const cached = wx.getStorageSync('todos_' + family._id) || [];
         if (cached.length) this.renderTodos(cached);
-        this.setData({ loading: false, hasFamily: true, family, myOpenid: openid, myNick, todosReady: !!cached.length, totalDone: (family && family.totalDone) || 0 });
+        this.setData({ loading: false, offline: false, hasFamily: true, family, myOpenid: openid, myNick, todosReady: !!cached.length, totalDone: (family && family.totalDone) || 0, annivInfo, dailyPhrase: dailyWarm() });
         wx.setStorageSync('familyId', family._id);
         this.syncStart();
       } else {
         this.syncStop();
         wx.removeStorageSync('familyId');
-        this.setData({ loading: false, hasFamily: false, family: null, todos: [], myOpenid: openid });
+        this.setData({ loading: false, offline: false, hasFamily: false, family: null, todos: [], myOpenid: openid, annivInfo: { nextLabel: '' } });
       }
     } catch (e) {
-      this.setData({ loading: false });
-      wx.showToast({ title: e.message || '加载失败', icon: 'none' });
+      // 网络/云端异常：若本地有缓存家庭，回退展示缓存，避免把有家庭用户误引到"创建家庭"空状态
+      const cachedFamily = app.globalData.family || wx.getStorageSync('myFamily');
+      if (cachedFamily) {
+        const cachedOpenid = app.globalData.openid || wx.getStorageSync('myOpenid');
+        const openid = cachedOpenid || '';
+        const myNick = (cachedFamily.memberNicks && cachedFamily.memberNicks[openid]) || '我';
+        const annivInfo = buildAnnivInfo(cachedFamily);
+        const cachedTodos = wx.getStorageSync('todos_' + cachedFamily._id) || [];
+        if (cachedTodos.length) this.renderTodos(cachedTodos);
+        app.globalData.openid = openid;
+        app.globalData.family = cachedFamily;
+        wx.setStorageSync('familyId', cachedFamily._id);
+        this.setData({ loading: false, offline: true, hasFamily: true, family: cachedFamily, myOpenid: openid, myNick, todosReady: !!cachedTodos.length, totalDone: (cachedFamily && cachedFamily.totalDone) || 0, annivInfo, dailyPhrase: dailyWarm() });
+        this.syncStart(); // watch 失败会自动降级轮询，网络恢复后能拉到最新
+      } else {
+        this.setData({ loading: false });
+        wx.showToast({ title: e.message || '加载失败', icon: 'none' });
+      }
     }
+  },
+
+  // 离线提示条：点了重新拉取一次家庭数据
+  onRetryLoad() {
+    wx.showLoading({ title: '重试中', mask: true });
+    this.loadFamily()
+      .catch(() => {})
+      .finally(() => wx.hideLoading());
   },
 
   // 同步策略：实时推送为主，失败自动降级轮询（永不中断）
@@ -319,17 +424,23 @@ Page({
   },
 
   renderTodos(todos) {
+    const nicks = (this.data.family && this.data.family.memberNicks) || {};
+    const my = this.data.myOpenid;
     const mapped = todos.map((t) => ({
       ...t,
       timeText: fmtTime(t.createTime),
       doneTimeText: fmtTime(t.doneTime),
-      mine: t.creatorOpenid === this.data.myOpenid,
+      mine: t.creatorOpenid === my,
       dayInfo: calcDeadline(t.deadline),
+      // 指派徽标：assignedToMe → 我用我的配色；否则显示对方昵称
+      assignNick: t.assignee ? (nicks[t.assignee] || 'TA') : '',
+      assignToMe: !!t.assignee && t.assignee === my,
     }));
     // 未完成在前（重要>临近7天>普通），已完成沉底；同类按创建时间倒序
     mapped.sort((a, b) => this.cmpTodos(a, b));
     const doneCount = mapped.filter((t) => t.done).length;
-    this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount });
+    const weeklyDone = countWeeklyDone(mapped); // 周小结
+    this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount, weeklyDone });
     // 记录本次快照，供 announceChanges 做同源对比
     this._prevTodos = {};
     mapped.forEach((t) => { this._prevTodos[t._id] = { done: !!t.done, content: t.content, important: !!t.important }; });
@@ -363,10 +474,11 @@ Page({
       return;
     }
     const deadline = this.data.inputDeadline; // 先取日期，再清空状态
-    this.setData({ inputVal: '', inputDeadline: '', inputDeadlineText: '' });
+    const assignee = this.data.assignFor;      // 指派成员（openid）
+    this.setData({ inputVal: '', inputDeadline: '', inputDeadlineText: '', assignFor: '', assignForText: '👥 一起' });
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, deadline);
+      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, deadline, assignee);
       this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
       wx.hideLoading();
     } catch (e) {
@@ -375,13 +487,33 @@ Page({
     }
   },
 
+  // 底部「指派给谁」chip：在成员里选一个指定执行人
+  onPickAssign() {
+    const mems = (this.data.family && this.data.family.memberNicks) || {};
+    const me = this.data.myOpenid;
+    const opts = [{ label: '👥 一起做（不指派）', val: '' }];
+    opts.push({ label: `给我（${this.data.myNick}）`, val: me });
+    Object.keys(mems).forEach((o) => {
+      if (o !== me) opts.push({ label: `给 ${mems[o]}`, val: o });
+    });
+    wx.showActionSheet({
+      itemList: opts.map((o) => o.label),
+      success: (res) => {
+        if (res.tapIndex < 0) return;
+        const c = opts[res.tapIndex];
+        this.setData({ assignFor: c.val, assignForText: c.label });
+      },
+      fail: () => { /* 取消 */ },
+    });
+  },
+
   // 空态一键填入示例模板
   async useTemplate(e) {
     const content = (e.currentTarget.dataset.content || '').trim();
     if (!content) return;
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick);
+      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, '', this.data.assignFor);
       this.fetchTodos();
       wx.hideLoading();
     } catch (err) {
@@ -475,11 +607,12 @@ Page({
     if (!todo) return;
     const markLabel = todo.important ? '⭐ 取消重要' : '⭐ 设为重要';
     wx.showActionSheet({
-      itemList: [markLabel, '✏️ 编辑', '🗑️ 删除'],
+      itemList: [markLabel, '👤 指派给谁', '✏️ 编辑', '🗑️ 删除'],
       success: (res) => {
         if (res.tapIndex === 0) this.onToggleImportant(e);
-        else if (res.tapIndex === 1) this.onEnterEdit(e);
-        else if (res.tapIndex === 2) this.onDeleteTodo(e);
+        else if (res.tapIndex === 1) this.onAssignTodo(e);
+        else if (res.tapIndex === 2) this.onEnterEdit(e);
+        else if (res.tapIndex === 3) this.onDeleteTodo(e);
       },
     });
   },
@@ -510,6 +643,39 @@ Page({
     this.renderTodos(todos);
   },
 
+  // 长按菜单：指派给谁（openid，空=两人一起）——乐观更新 + 云端落库
+  async onAssignTodo(e) {
+    const { index } = e.currentTarget.dataset;
+    const todo = this.data.todos[index];
+    if (!todo) return;
+    const mems = (this.data.family && this.data.family.memberNicks) || {};
+    const me = this.data.myOpenid;
+    const opts = [{ label: '👥 一起做（取消指派）', val: '' }];
+    opts.push({ label: `给我（${this.data.myNick}）`, val: me });
+    Object.keys(mems).forEach((o) => {
+      if (o !== me) opts.push({ label: `给 ${mems[o]}`, val: o });
+    });
+    wx.showActionSheet({
+      itemList: opts.map((o) => o.label),
+      success: async (res) => {
+        if (res.tapIndex < 0) return;
+        const assignee = opts[res.tapIndex].val;
+        const prev = this.data.todos.slice();
+        // 乐观更新旧先本地反映
+        this.renderTodos(prev.map((t) => (t._id === todo._id ? { ...t, assignee } : t)));
+        try {
+          await assignTodo(todo._id, assignee);
+          this.suppressChange(todo._id);
+          this.fetchTodos();
+          wx.showToast({ title: assignee ? '已指派' : '已取消指派', icon: 'none' });
+        } catch (err) {
+          this.renderTodos(prev);
+          wx.showToast({ title: '操作失败，请重试', icon: 'none' });
+        }
+      },
+    });
+  },
+
   // 一键清空已完成（5 秒内可撤销）
   onClearDone() {
     const doneItems = this.data.doneCount;
@@ -525,11 +691,7 @@ Page({
         const removed = this.removeLocally((t) => t.done);
         if (!removed.length) return;
         wx.vibrateShort({ type: 'light' });
-        this.startUndo({
-          removed,
-          label: `已清空 ${removed.length} 条已完成`,
-          proc: clearDoneTodos,
-        });
+        this.startUndo({ removed, proc: clearDoneTodos });
       },
     });
   },
@@ -545,22 +707,28 @@ Page({
     return removed;
   },
 
-  // 开始一个 5 秒的撤销窗口；超时后真正执行删除
-  startUndo({ removed, label, proc }) {
+  // 开始一个 5 秒的撤销窗口；窗口内再次删除/清空会**并入同一队列**，
+  // 一次撤销即可全部恢复，超时后统一真正删除（避免前一条"丢失"导致待办复活）
+  startUndo({ removed, proc }) {
     if (this._undoTimer) { clearTimeout(this._undoTimer); this._undoTimer = null; }
-    this._undo = { removed, proc };
-    this.setData({ undoLabel: label });
+    const pending = (this._undo && this._undo.pending) || [];
+    removed.forEach((t) => pending.push({ todo: t, proc }));
+    this._undo = { pending };
+    const n = pending.length;
+    this.setData({ undoLabel: `已移除 ${n} 条，5 秒内可撤销` });
     this._undoTimer = setTimeout(() => this.fireUndoAction(), 5000);
   },
 
-  // 点「撤销」：恢复被移除的条目
+  // 点「撤销」：恢复所有待撤销的条目
   onUndo() {
     if (this._undoTimer) { clearTimeout(this._undoTimer); this._undoTimer = null; }
     const u = this._undo;
     this._undo = null;
+    this._undoTimer = null;
     this.setData({ undoLabel: '' });
-    if (!u || !u.removed.length) return;
-    const todos = this.data.todos.concat(u.removed);
+    if (!u || !u.pending || !u.pending.length) return;
+    const restored = u.pending.map((p) => p.todo);
+    const todos = this.data.todos.concat(restored);
     this.renderTodos(todos);
     wx.showToast({ title: '已撤销', icon: 'none' });
   },
@@ -571,10 +739,15 @@ Page({
     this._undo = null;
     this._undoTimer = null;
     this.setData({ undoLabel: '' });
-    if (!u) return;
-    this.suppressAll(u.removed);
+    if (!u || !u.pending || !u.pending.length) return;
+    // 待真正删除的条目做同步静默，避免被播报成"对方删除"
+    this.suppressAll(u.pending.map((p) => p.todo));
+    // 去重执行各 proc：clearDoneTodos 是同一个函数引用只执行一次；
+    // removeTodo 每个是独立闭包，天然一条一个，无需去重
+    const procSet = new Set();
+    u.pending.forEach((p) => { if (p.proc) procSet.add(p.proc); });
     try {
-      if (u.proc) await u.proc();
+      for (const proc of procSet) await proc();
     } catch (e) { console.error('[undo] 执行失败', e); }
     this.fetchTodos();
   },
@@ -642,11 +815,7 @@ Page({
         const removed = this.removeLocally((t) => t._id === todo._id);
         if (!removed.length) return;
         wx.vibrateShort({ type: 'light' });
-        this.startUndo({
-          removed,
-          label: `已删除「${todo.content}」`,
-          proc: () => removeTodo(todo._id),
-        });
+        this.startUndo({ removed, proc: () => removeTodo(todo._id) });
       },
     });
   },
@@ -673,36 +842,6 @@ Page({
 
   goCreate() {
     wx.navigateTo({ url: '/pages/create/create' });
-  },
-
-  // —— 家庭名改名 ——
-  onEditFamName() {
-    this.setData({ famNameInput: this.data.family ? this.data.family.name : '', editingFamName: true });
-  },
-  onCancelFamName() {
-    this.setData({ editingFamName: false, famNameInput: '' });
-  },
-  onFamNameInput(e) {
-    this.setData({ famNameInput: e.detail.value });
-  },
-  async onSaveFamName() {
-    const name = (this.data.famNameInput || '').trim().slice(0, 20);
-    if (!name) {
-      wx.showToast({ title: '名称不能为空', icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '保存中' });
-    try {
-      await renameFamily(name);
-      const fresh = await getMyFamily();
-      app.globalData.family = fresh.family;
-      this.setData({ family: fresh.family, editingFamName: false, famNameInput: '' });
-      wx.hideLoading();
-      wx.showToast({ title: '已改名', icon: 'success' });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
-    }
   },
 
   goJoin() {

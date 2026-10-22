@@ -25,6 +25,7 @@
 .input-wrap .input-line { flex: 1; background: transparent; padding: 28rpx 0; }
 
 .submit { margin-top: 12rpx; width: 100%; }
+.share-now { margin: 0 0 20rpx; width: 100%; }
 
 .success { padding: 48rpx 48rpx; text-align: center; }
 .success-emoji {

@@ -51,6 +51,7 @@
       <text class="copy-hint">点击复制</text>
     </view>
     <view class="muted tip">对方打开小程序 →「我有邀请码，加入」→ 输入这 6 位数即可</view>
-    <button class="btn-primary" bindtap="backHome">进入小本本</button>
+    <button class="btn-primary share-now" open-type="share">🎁 分享卡片来请 TA</button>
+    <button class="btn-ghost" bindtap="backHome">进入小本本</button>
   </view>
 </view>

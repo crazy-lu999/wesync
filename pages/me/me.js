@@ -1,10 +1,26 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover, setNote, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, setCover, addAnniversary, editAnniversary, removeAnniversary, listFeedbacks, markFeedbackRead, renameFamily } = require('../../utils/db.js');
+const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
 // 由 (family, openid) 生成页面视图数据。
 // 注意：photos/cover 是 fileID，photoUrls/coverUrl 是云函数下发的临时可访问 URL（跨成员可看）。
+function fmtAnnivDate(s) {
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s || '');
+  return m ? `${+m[2]}月${+m[3]}日` : '';
+}
+// 距最近一个周年还有多少天（倒计时）
+function countdownDays(s) {
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s || '');
+  if (!m) return null;
+  const mo = +m[2], d = +m[3];
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), mo - 1, d);
+  if (next < today) next.setFullYear(now.getFullYear() + 1);
+  return Math.round((next - today) / 86400000);
+}
 function buildView(family, openid) {
   const memberNicks = (family && family.memberNicks) || {};
   const myNick = memberNicks[openid] || '我';
@@ -25,7 +41,6 @@ function buildView(family, openid) {
   photos.forEach((f, i) => {
     if (f !== cover) gridPhotos.push({ fileID: f, url: photoUrls[i], index: i });
   });
-  const note = (family && family.note) || null;
   return {
     family: family || null,
     myOpenid: openid || '',
@@ -40,7 +55,14 @@ function buildView(family, openid) {
     coverIndex: cover ? photos.indexOf(cover) : -1,
     photoWallTitle: ((family && family.wallTitle) || '').trim() || config.PHOTO_WALL_TITLE,
     photoMax: 9,
-    note,
+    // 纪念日列表（可多个，每个含标题+日期）；含天数
+    annivs: ((family && (Array.isArray(family.anniversaries) ? family.anniversaries : (family.anniversary ? [{ id: 'legacy-1', title: '我们的纪念日', date: String(family.anniversary) }] : []))) || []).map((a) => ({
+      id: a.id,
+      title: (a.title || '').trim() || '纪念日',
+      date: fmtAnnivDate(a.date),
+      dateRaw: a.date,
+      countdown: (() => { const cd = countdownDays(a.date); return cd == null ? -1 : cd; })(),
+    })),
   };
 }
 
@@ -62,6 +84,10 @@ Page({
     photos: [], // 云存储 fileID 列表
     photoUrls: [], // 与 photos 一一对应的临时可访问 URL（对方也能看图）
     gridPhotos: [], // 网格展示用：排除封面后的照片（含原始下标）
+    // 家庭名重命名
+    editingFamName: false,
+    famNameInput: '',
+    // 相片墙设置
     cover: '', // 封面 fileID
     coverUrl: '', // 封面临时可访问 URL
     coverSource: '', // 裁剪封面的来源原图 fileID
@@ -70,10 +96,17 @@ Page({
     photoWallTitle: config.PHOTO_WALL_TITLE,
     editingWallTitle: false,
     wallTitleInput: '',
-    // 悄悄话留言墙
-    note: null,
-    editingNote: false,
-    noteInput: '',
+    // 纪念日
+    annivs: [],
+    editingAnniv: false,
+    editingAnnivId: '',
+    titleInput: '',
+    dateInput: '',
+    today: (() => {
+      const n = new Date();
+      const p = (x) => String(x).padStart(2, '0');
+      return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
+    })(),
     loading: true,
     editingNick: false,
     nickInput: '',
@@ -122,8 +155,6 @@ Page({
       wx.setStorageSync('myFamily', family);
       wx.setStorageSync('myOpenid', openid);
       await this.applyFamily(family, openid, { loading: false });
-      // [debug] 反馈管理入口显隐调试：确认运行时 openid 是否等于 adminOpenid
-      console.log('[debug-feedback] myOpenid =', ',', openid, '| adminOpenid =', config.ADMIN_OPENID, '| isAdmin =', openid === config.ADMIN_OPENID);
     } catch (e) {
       // 网络失败但已有缓存时保留缓存内容，不打断浏览
       if (!this.data.family) this.setData({ loading: false });
@@ -131,7 +162,7 @@ Page({
     }
   },
 
-  // 手动刷新：成员可点悬浮按钮拉取最新家庭数据（含相片墙/悄悄话/昵称）
+  // 手动刷新：成员可点悬浮按钮拉取最新家庭数据（含相片墙/昵称/纪念日）
   onRefresh() {
     if (this._refreshing) return;
     this._refreshing = true;
@@ -192,11 +223,44 @@ Page({
     }
   },
 
+  // —— 家庭名重命名 ——
+  onEditFamName() {
+    this.setData({ famNameInput: this.data.family ? this.data.family.name : '', editingFamName: true });
+  },
+  onCancelFamName() {
+    this.setData({ editingFamName: false, famNameInput: '' });
+  },
+  onFamNameInput(e) {
+    this.setData({ famNameInput: e.detail.value });
+  },
+  async onSaveFamName() {
+    const name = (this.data.famNameInput || '').trim().slice(0, 20);
+    if (!name) {
+      wx.showToast({ title: '名称不能为空', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '保存中' });
+    try {
+      await renameFamily(name);
+      const fresh = await getMyFamily();
+      app.globalData.family = fresh.family;
+      wx.setStorageSync('myFamily', fresh.family);
+      await this.applyFamily(fresh.family, fresh.openid, { editingFamName: false, famNameInput: '' });
+      wx.hideLoading();
+      wx.showToast({ title: '已改名', icon: 'success' });
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
+    }
+  },
+
   onLeave() {
     wx.showModal({
       title: '退出家庭',
-      content: '退出后你将不再看到共享清单。确定吗？',
-      confirmColor: '#FF7A59',
+      content: '退出后不再看到共享清单；\n若两人都退出，家庭及全部数据（待办、相片墙、纪念日）将被永久清空，无法恢复。确定吗？',
+      confirmText: '退出',
+      confirmColor: '#F0413B',
+      cancelText: '再想想',
       success: (res) => {
         if (res.confirm) this.doLeave();
       },
@@ -242,12 +306,6 @@ Page({
   },
 
   // —— 反馈管理 ——
-
-  async onFeedbackManage() {
-    const willShow = !this.data.showFeedbackList;
-    this.setData({ showFeedbackList: willShow });
-    if (willShow) await this.loadFeedbacks();
-  },
 
   async onFeedbackManage() {
     const willShow = !this.data.showFeedbackList;
@@ -313,65 +371,124 @@ Page({
     }
   },
 
-  // —— 悄悄话留言墙 ——
-  onEditNote() {
-    const cur = (this.data.note && this.data.note.text) || '';
-    this.setData({ noteInput: cur, editingNote: true });
+  // —— 纪念日（可多个，各含标题+日期）——
+  onAddAnniv() {
+    this.setData({ editingAnnivId: '', titleInput: '', dateInput: this.data.today, editingAnniv: true });
   },
-  onCancelNote() {
-    this.setData({ editingNote: false, noteInput: '' });
+  onEditAnniv(e) {
+    const id = String(e.currentTarget.dataset.id || '');
+    const it = this.data.annivs.find((x) => x.id === id);
+    this.setData({
+      editingAnnivId: id,
+      titleInput: (it && it.title) || '',
+      dateInput: (it && it.dateRaw) || this.data.today,
+      editingAnniv: true,
+    });
   },
-  onNoteInput(e) {
-    this.setData({ noteInput: e.detail.value });
+  onTitleInput(e) {
+    this.setData({ titleInput: e.detail.value });
   },
-  async onSaveNote() {
-    const text = (this.data.noteInput || '').trim().slice(0, 100);
-    if (!text) {
-      wx.showToast({ title: '写点内容吧', icon: 'none' });
+  onDatePick(e) {
+    this.setData({ dateInput: e.detail.value });
+  },
+  onCancelAnniv() {
+    this.setData({ editingAnniv: false, editingAnnivId: '', titleInput: '', dateInput: '' });
+  },
+  async onSaveAnniv() {
+    const date = (this.data.dateInput || '').trim();
+    if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(date)) {
+      wx.showToast({ title: '选个日期吧', icon: 'none' });
       return;
     }
-    wx.showLoading({ title: '发送中' });
+    let title = (this.data.titleInput || '').trim().slice(0, 12);
+    if (!title) title = '纪念日';
+    wx.showLoading({ title: '保存中' });
     try {
-      await setNote(text);
+      const id = this.data.editingAnnivId;
+      if (id) {
+        await editAnniversary(id, title, date);
+      } else {
+        await addAnniversary(Date.now().toString(36), title, date);
+      }
       const fresh = await getMyFamily();
       app.globalData.family = fresh.family;
       wx.setStorageSync('myFamily', fresh.family);
-      await this.applyFamily(fresh.family, fresh.openid, { editingNote: false, noteInput: '' });
+      await this.applyFamily(fresh.family, fresh.openid, { editingAnniv: false, editingAnnivId: '', titleInput: '', dateInput: '' });
       wx.hideLoading();
-      wx.showToast({ title: '已留言', icon: 'success' });
+      wx.showToast({ title: id ? '已更新 💕' : '已记住这个日子 💕', icon: 'none' });
     } catch (e) {
       wx.hideLoading();
-      wx.showToast({ title: e.message || '发送失败', icon: 'none' });
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
     }
+  },
+  // 编辑态里的删除按钮
+  onDelAnniv() {
+    const id = this.data.editingAnnivId;
+    if (!id) return;
+    wx.showModal({
+      title: '删除这个纪念日？',
+      content: '从列表里移除这个纪念日。',
+      confirmColor: '#F0413B',
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '删除中' });
+        try {
+          await removeAnniversary(id);
+          const fresh = await getMyFamily();
+          app.globalData.family = fresh.family;
+          wx.setStorageSync('myFamily', fresh.family);
+          await this.applyFamily(fresh.family, fresh.openid, { editingAnniv: false, editingAnnivId: '', titleInput: '', dateInput: '' });
+          wx.hideLoading();
+          wx.showToast({ title: '已删除', icon: 'none' });
+        } catch (err) {
+          wx.hideLoading();
+          wx.showToast({ title: err.message || '删除失败', icon: 'none' });
+        }
+      },
+    });
   },
 
   onPickPhotos() {
+    if (this._picking) return; // 防重：避免连点重复上传
+    const remain = this.data.photoMax - this.data.photos.length;
+    if (remain <= 0) {
+      wx.showToast({ title: '最多 9 张啦', icon: 'none' });
+      return;
+    }
+    this._picking = true;
     wx.chooseMedia({
-      count: 1,
+      count: Math.min(remain, 9), // 一次性多选，剩余还能传几张就传几张
       mediaType: ['image'],
       sizeType: ['compressed'],
       success: async (res) => {
-        if (!res.tempFiles.length) return;
-        const f = res.tempFiles[0];
-        const filePath = f.tempFilePath;
-        const ext = (filePath.match(/\.[a-zA-Z0-9]+$/) || ['.jpg'])[0];
-        const cloudPath = `photos/${this.data.myOpenid}/${Date.now()}${ext}`;
-        wx.showLoading({ title: '上传中' });
+        if (!res.tempFiles.length) { this._picking = false; return; }
+        wx.showLoading({ title: '上传中', mask: true });
         try {
-          const up = await wx.cloud.uploadFile({ cloudPath, filePath });
-          await addFamilyPhotos([up.fileID]);
+          const fileIDs = [];
+          for (let i = 0; i < res.tempFiles.length; i++) {
+            const f = res.tempFiles[i];
+            const filePath = f.tempFilePath;
+            const ext = (filePath.match(/\.[a-zA-Z0-9]+$/) || ['.jpg'])[0];
+            const cloudPath = `photos/${this.data.myOpenid}/${Date.now()}_${i}${ext}`;
+            const up = await wx.cloud.uploadFile({ cloudPath, filePath });
+            fileIDs.push(up.fileID);
+          }
+          await addFamilyPhotos(fileIDs);
           // 刷新照片墙（家庭对象含最新 photos）
           const fresh = await getMyFamily();
           app.globalData.family = fresh.family;
           wx.setStorageSync('myFamily', fresh.family);
           await this.applyFamily(fresh.family, fresh.openid);
           wx.hideLoading();
-          wx.showToast({ title: '已上传', icon: 'success' });
+          this._picking = false;
+          wx.showToast({ title: `已上传 ${fileIDs.length} 张`, icon: 'success' });
         } catch (e) {
           wx.hideLoading();
+          this._picking = false;
           wx.showToast({ title: e.message || '上传失败', icon: 'none' });
         }
       },
+      fail: () => { this._picking = false; },
     });
   },
 
@@ -534,5 +651,14 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: e.message || '操作失败', icon: 'none' });
     }
+  },
+
+  // 转发给朋友：统一品牌卡，引导新用户建自己的小家（分享诉求只有拉新家庭）
+  onShareAppMessage() {
+    return buildShare();
+  },
+
+  onShareTimeline() {
+    return buildShare();
   },
 });

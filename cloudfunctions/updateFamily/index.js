@@ -6,6 +6,9 @@
 //   action: 'rename'      另传 { name: '新家庭名' }
 //   action: 'setCover'    另传 { fileID: 'cloud://...' }（空串=取消封面）
 //   action: 'setWallTitle' 另传 { wallTitle: '...' }
+//   action: 'addAnniversary'    另传 { id, title, date }（新增一个纪念日）
+//   action: 'editAnniversary'   另传 { id, title, date }（编辑某个纪念日）
+//   action: 'removeAnniversary' 另传 { id }（删除某个纪念日）
 // 返回: { code, message, data:{ photos, name } }
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -22,6 +25,14 @@ exports.main = async (event) => {
   if (!res.data.length) return { code: -1, message: '未找到你的家庭' };
   const fam = res.data[0];
   const famRef = db.collection('families').doc(fam._id);
+
+  // 校验日期 YYYY-MM-DD
+  const validDate = (s) => /^\d{4}-\d{1,2}-\d{1,2}$/.test(String(s || '').trim());
+  // 获取纪念日列表（兼容老单值 anniversary：未迁移时先用它当第一个）
+  const anniversaries = Array.isArray(fam.anniversaries)
+    ? fam.anniversaries.slice()
+    : (fam.anniversary ? [{ id: 'legacy-1', title: '我们的纪念日', date: String(fam.anniversary) }] : []);
+
 
   // —— 新增照片 ——
   if (action === 'addPhotos') {
@@ -106,14 +117,39 @@ exports.main = async (event) => {
     return { code: 0, message: '已保存', data: { wallTitle } };
   }
 
-  // —— 悄悄话留言墙 ——
-  if (action === 'setNote') {
-    const text = (event.text || '').trim().slice(0, 100);
-    if (!text) return { code: -1, message: '留言不能为空' };
-    const nicks = fam.memberNicks || {};
-    const nick = nicks[OPENID] || '我';
-    await famRef.update({ data: { note: { text, nick, time: db.serverDate() } } });
-    return { code: 0, message: '已留言', data: { note: { text, nick } } };
+
+  // —— 纪念日：新增 ——
+  if (action === 'addAnniversary') {
+    const date = String(event.date || '').trim();
+    if (!validDate(date)) return { code: -1, message: '日期格式不对' };
+    const title = (event.title || '').trim().slice(0, 12) || '纪念日';
+    const id = String(event.id || Date.now());
+    if (anniversaries.some((a) => a.id === id)) return { code: -1, message: '重复' };
+    anniversaries.push({ id, title, date });
+    await famRef.update({ data: { anniversaries } });
+    return { code: 0, message: '已添加', data: { anniversaries } };
+  }
+
+  // —— 纪念日：编辑（标题/日期）——
+  if (action === 'editAnniversary') {
+    const id = String(event.id || '');
+    const date = String(event.date || '').trim();
+    if (!id || !validDate(date)) return { code: -1, message: '日期格式不对' };
+    const title = (event.title || '').trim().slice(0, 12) || '纪念日';
+    const list = anniversaries.map((a) => (a.id === id ? { ...a, title, date } : a));
+    await famRef.update({ data: { anniversaries: list } });
+    return { code: 0, message: '已保存', data: { anniversaries: list } };
+  }
+
+  // —— 纪念日：删除 ——
+  if (action === 'removeAnniversary') {
+    const id = String(event.id || '');
+    const list = anniversaries.filter((a) => a.id !== id);
+    const data = { anniversaries: list };
+    // 删空后顺带清掉老单值 anniversary，避免 getMyFamily 误当“没迁移”又复活
+    if (!list.length) data.anniversary = '';
+    await famRef.update({ data });
+    return { code: 0, message: '已删除', data: { anniversaries: list } };
   }
 
   return { code: -1, message: '未知操作' };

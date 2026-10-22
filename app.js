@@ -31,7 +31,7 @@ App({
       // 已用弹窗提醒：打个全局标记，首页横幅据此让位，避免弹窗+横幅重复提醒
       this.globalData.updateDialogShown = true;
       wx.showModal({
-        title: '悄悄话：有更新啦 🎉',
+        title: '有更新啦 🎉',
         content: '我又偷偷加了好玩的功能，\n重启一下就能用上新版哦～❤️',
         showCancel: false,
         confirmText: '马上重启',

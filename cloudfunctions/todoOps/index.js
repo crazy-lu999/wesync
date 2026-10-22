@@ -1,10 +1,11 @@
 // cloudfunctions/todoOps/index.js — 待办增删改（服务端写，绕过客户端安全规则）
-// action: 'add' | 'toggle' | 'important' | 'remove' | 'edit' | 'clearDone'
-// add:      { action:'add', familyId, content, openid, creatorNick }
+// action: 'add' | 'toggle' | 'important' | 'remove' | 'edit' | 'assign' | 'clearDone'
+// add:      { action:'add', familyId, content, openid, creatorNick, deadline, assignee }
 // toggle:   { action:'toggle', id, done }（完成时服务端记录完成人 + 累加家庭里程碑
 // important: { action:'important', id, important }
 // remove:   { action:'remove', id }
-// edit:     { action:'edit', id, content }
+// edit:     { action:'edit', id, content, deadline, assignee }
+// assign:   { action:'assign', id, assignee }（更新待办指派成员 openid，空串=取消指派）
 // clearDone: { action:'clearDone' }（清空本家庭全部已完成）
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -17,6 +18,7 @@ exports.main = async (event) => {
       const familyId = String(event.familyId || '');
       const content = String(event.content || '').trim();
       const deadline = event.deadline ? String(event.deadline) : null;
+      const assignee = event.assignee ? String(event.assignee) : '';
       if (!familyId || !content) return { code: 1, message: '参数不完整' };
       // 取该家庭成员 openid，写入 todo.members，供 read 规则用 auth.openid in doc.members 判断
       let members = [];
@@ -37,6 +39,7 @@ exports.main = async (event) => {
           creatorOpenid: OPENID,
           creatorNick: String(event.creatorNick || '我'),
           deadline,
+          assignee, // 指派成员 openid（空串=两人一起）
           createTime: db.serverDate(),
           doneTime: null,
         },
@@ -99,6 +102,15 @@ exports.main = async (event) => {
         data.deadline = event.deadline ? String(event.deadline) : null;
       }
       await db.collection('todos').doc(id).update({ data });
+      return { code: 0, message: 'ok', data: {} };
+    }
+
+    if (event.action === 'assign') {
+      const id = String(event.id || '');
+      if (!id) return { code: 1, message: '参数不完整' };
+      await db.collection('todos').doc(id).update({
+        data: { assignee: event.assignee ? String(event.assignee) : '' },
+      });
       return { code: 0, message: 'ok', data: {} };
     }
 

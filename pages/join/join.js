@@ -1,5 +1,6 @@
 // pages/join/join.js
 const { joinFamily } = require('../../utils/db.js');
+const { buildShare } = require('../../utils/share.js');
 const app = getApp();
 
 Page({
@@ -7,6 +8,15 @@ Page({
     inviteCode: '',
     myNick: '',
     submitting: false,
+    preFilled: false, // 是否通过分享卡片带入邀请码
+  },
+
+  onLoad(options) {
+    // 分享卡片/朋友圈带码进来：自动填入邀请码，用户只起个昵称即可加入
+    const code = String((options && options.inviteCode) || '').trim();
+    if (/^\d{6}$/.test(code)) {
+      this.setData({ inviteCode: code, preFilled: true });
+    }
   },
 
   onInput(e) {
@@ -40,5 +50,14 @@ Page({
       wx.showToast({ title: e.message || '加入失败', icon: 'none' });
       this.setData({ submitting: false });
     }
+  },
+
+  // 转发给朋友/朋友圈：统一品牌卡，引导新用户建自己的小家
+  onShareAppMessage() {
+    return buildShare();
+  },
+
+  onShareTimeline() {
+    return buildShare();
   },
 });
