@@ -286,13 +286,43 @@ Page({
     }
   },
 
+  // 首次进入：先用本地缓存（全局/存储）立即渲染并关 loading，避免"一直加载再跳出来"的体验；
+  // 同时后台静默拉取最新家庭信息 + 开启实时同步，保证成员/昵称/照片/里程碑都是最新的。
   async loadFamily() {
+    // ① 首屏秒显：有缓存家庭就直接渲染并置 loading=false，不等云函数
+    const cachedFamily = app.globalData.family || wx.getStorageSync('myFamily');
+    const cachedOpenid = app.globalData.openid || wx.getStorageSync('myOpenid');
+    if (cachedFamily && cachedOpenid) {
+      const myNick = (cachedFamily.memberNicks && cachedFamily.memberNicks[cachedOpenid]) || '我';
+      const annivInfo = buildAnnivInfo(cachedFamily);
+      const cachedTodos = wx.getStorageSync('todos_' + cachedFamily._id) || [];
+      app.globalData.openid = cachedOpenid;
+      app.globalData.family = cachedFamily;
+      wx.setStorageSync('familyId', cachedFamily._id);
+      // 先写家庭/mynick 再渲染缓存待办，避免命中 old family 导致昵称/指派徽标闪错
+      this.setData({ loading: false, offline: false, hasFamily: true, family: cachedFamily, myOpenid: cachedOpenid, myNick, todosReady: !!cachedTodos.length, totalDone: (cachedFamily && cachedFamily.totalDone) || 0, annivInfo, dailyPhrase: dailyWarm() });
+      if (cachedTodos.length) this.renderTodos(cachedTodos);
+      // 后台静默刷新：拉最新家庭 + 开启实时同步（失败自动回退本地缓存，不打断浏览）
+      this.loadFromCloud();
+      return;
+    }
+    // ② 无缓存：走云端加载
+    await this.loadFromCloud();
+  },
+
+  // 从云端拉取家庭并开启同步。①缓存首屏场景下后台静默调用；②无缓存场景下 await 阻塞加载。
+  async loadFromCloud() {
     try {
       const data = await getMyFamily();
       const openid = data.openid;
       const family = data.family;
       app.globalData.openid = openid;
       app.globalData.family = family;
+      // 缓存家庭，下次进入直接秒显
+      if (family) {
+        wx.setStorageSync('myFamily', family);
+        wx.setStorageSync('myOpenid', openid);
+      }
 
       if (family) {
         const myNick = (family.memberNicks && family.memberNicks[openid]) || '我';
@@ -300,13 +330,16 @@ Page({
         const annivInfo = buildAnnivInfo(family);
         // 先用本地缓存立即可见，避免等云函数返回时空白（首屏秒显）
         const cached = wx.getStorageSync('todos_' + family._id) || [];
-        if (cached.length) this.renderTodos(cached);
         this.setData({ loading: false, offline: false, hasFamily: true, family, myOpenid: openid, myNick, todosReady: !!cached.length, totalDone: (family && family.totalDone) || 0, annivInfo, dailyPhrase: dailyWarm() });
+        if (cached.length) this.renderTodos(cached);
         wx.setStorageSync('familyId', family._id);
         this.syncStart();
       } else {
         this.syncStop();
         wx.removeStorageSync('familyId');
+        // 确认真实无家庭：清缓存，避免下次误以为有家庭
+        wx.removeStorageSync('myFamily');
+        wx.removeStorageSync('myOpenid');
         this.setData({ loading: false, offline: false, hasFamily: false, family: null, todos: [], myOpenid: openid, annivInfo: { nextLabel: '' } });
       }
     } catch (e) {
@@ -318,11 +351,11 @@ Page({
         const myNick = (cachedFamily.memberNicks && cachedFamily.memberNicks[openid]) || '我';
         const annivInfo = buildAnnivInfo(cachedFamily);
         const cachedTodos = wx.getStorageSync('todos_' + cachedFamily._id) || [];
-        if (cachedTodos.length) this.renderTodos(cachedTodos);
         app.globalData.openid = openid;
         app.globalData.family = cachedFamily;
         wx.setStorageSync('familyId', cachedFamily._id);
         this.setData({ loading: false, offline: true, hasFamily: true, family: cachedFamily, myOpenid: openid, myNick, todosReady: !!cachedTodos.length, totalDone: (cachedFamily && cachedFamily.totalDone) || 0, annivInfo, dailyPhrase: dailyWarm() });
+        if (cachedTodos.length) this.renderTodos(cachedTodos);
         this.syncStart(); // watch 失败会自动降级轮询，网络恢复后能拉到最新
       } else {
         this.setData({ loading: false });
