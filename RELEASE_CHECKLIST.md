@@ -24,7 +24,7 @@
 
 ### 3. 重新部署有改动的云函数
 - [ ] `cloudfunctions/` 下有改动的函数，逐一「上传并部署」。
-      ⚠️ 尤其：`updateFamily`（封面裁剪/来源/孤儿清理）、`getLatestVersion`（兜底横幅）。
+      ⚠️ 尤其：`updateFamily`（相片墙/标题/删除）、`getLatestVersion`（兜底横幅）。
 - [ ] 确认用 **「云端安装依赖」** 方式部署（不在本地装 node_modules）。
 
 ### 4. 上传代码 & 发版
@@ -66,5 +66,5 @@
 
 - **横幅一直不出现** → 常规①已自动判断；若仍无，检查 `app_config` 是否建好/`_id` 是否 `latest-version`/`version` 是否高于本地 `APP_VERSION`。
 - **横幅一直不消失** → `app_config.version` 高于代码 `APP_VERSION` 且没同步，对齐即可。
-- **裁剪封面保存失败** → `updateFamily` 云函数没重新部署（旧版拒绝 `covers/` 文件）。
+- **照片删除失败** → `updateFamily` 云函数没重新部署。
 - **热启动收不到** → 确认 `app.js` 已注册 `onCheckForUpdate`、`index.js` `onShow` 调了 `checkLatestVersion()`，且 `getLatestVersion` 已部署。

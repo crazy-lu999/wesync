@@ -4,7 +4,6 @@
 //   action: 'addPhotos'  另传 { fileIDs: ['cloud://...', ...] }
 //   action: 'removePhoto' 另传 { fileID: 'cloud://...' }
 //   action: 'rename'      另传 { name: '新家庭名' }
-//   action: 'setCover'    另传 { fileID: 'cloud://...' }（空串=取消封面）
 //   action: 'setWallTitle' 另传 { wallTitle: '...' }
 //   action: 'addAnniversary'    另传 { id, title, date }（新增一个纪念日）
 //   action: 'editAnniversary'   另传 { id, title, date }（编辑某个纪念日）
@@ -59,11 +58,8 @@ exports.main = async (event) => {
   // —— 删除一张照片 ——
   if (action === 'removePhoto') {
     const fileID = event.fileID;
-    // 删除后若删掉的正是封面，顺带清空 cover
     const photos = (fam.photos || []).filter((f) => f !== fileID);
-    const data = { photos };
-    if ((fam.cover || '') === fileID) data.cover = '';
-    await famRef.update({ data });
+    await famRef.update({ data: { photos } });
     // 尽力清理云存储，失败不影响数据一致性
     if (fileID) {
       try { await cloud.deleteFile({ fileList: [fileID] }); } catch (e) { console.error(e); }
@@ -77,36 +73,6 @@ exports.main = async (event) => {
     if (!name) return { code: -1, message: '家庭名不能为空' };
     await famRef.update({ data: { name } });
     return { code: 0, message: '已改名', data: { name } };
-  }
-
-  // —— 设/取消封面 ——
-  if (action === 'setCover') {
-    const fileID = event.fileID || '';
-    // coverSource：裁剪封面的来源原图 fileID（供“重新裁剪”时回原图，而非在裁过的图上二次裁剪）
-    const source = event.source || (fileID && (fam.photos || []).includes(fileID) ? fileID : '');
-    const data = { cover: fileID };
-    if (fileID) {
-      const photos = fam.photos || [];
-      // 封面允许两种：相片墙里已有的照片，或裁剪后的独立封面文件(covers/… 由前端 wx.cropImage 生成上传)
-      const isCropCover = typeof fileID === 'string' && fileID.indexOf('covers/') !== -1;
-      if (!photos.includes(fileID) && !isCropCover) return { code: -1, message: '仅可设为已有照片' };
-      // 整图封面：来源即它自己；裁剪封面：来源为传入的 source（为空则回退为旧 coverSource 或空）
-      data.coverSource = !isCropCover ? fileID : (source || (fam.coverSource || ''));
-    } else {
-      data.coverSource = ''; // 取消封面时一并清来源
-    }
-    await famRef.update({ data });
-    // 主动清理旧封面孤儿文件：只删“裁剪产生的封面(covers/…)”且不再是当前封面/照片墙引用的
-    const oldCover = (fam.cover || '');
-    const isHiddenCropCover =
-      oldCover &&
-      oldCover.indexOf('covers/') !== -1 &&
-      oldCover !== fileID &&
-      !(fam.photos || []).includes(oldCover);
-    if (isHiddenCropCover) {
-      try { await cloud.deleteFile({ fileList: [oldCover] }); } catch (e) { console.error(e); }
-    }
-    return { code: 0, message: 'ok', data: { cover: fileID, photos: fam.photos || [] } };
   }
 
   // —— 修改相片墙标题 ——

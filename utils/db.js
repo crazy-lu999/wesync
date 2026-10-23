@@ -31,7 +31,6 @@ const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos',
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
 const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
 const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
-const setCover = (fileID, source) => call('updateFamily', { action: 'setCover', fileID, source });
 // 纪念日（可多个，各含标题+日期）：新增 / 编辑 / 删除
 const addAnniversary = (id, title, date) => call('updateFamily', { action: 'addAnniversary', id, title, date });
 const editAnniversary = (id, title, date) => call('updateFamily', { action: 'editAnniversary', id, title, date });
@@ -117,7 +116,6 @@ module.exports = {
   removeFamilyPhoto,
   renameFamily,
   setWallTitle,
-  setCover,
   addAnniversary,
   editAnniversary,
   removeAnniversary,

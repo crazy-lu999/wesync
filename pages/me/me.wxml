@@ -75,19 +75,13 @@
         <text wx:if="{{photos.length}}" class="muted photo-count">{{photos.length}}/{{photoMax}}</text>
       </view>
 
-      <!-- 封面：设了封面后顶部整幅展示（长按可取消封面） -->
-      <view wx:if="{{cover}}" class="cover-wrap" bindlongpress="onCoverMenu" hover-class="cell-hover">
-        <image class="cover-img" src="{{coverUrl}}" mode="aspectFill" bindtap="onPreviewCover"/>
-        <view class="cover-tag">🌟 封面 · 长按可取消</view>
-      </view>
-
       <!-- 空态：居中大占位，点击上传第一张 -->
       <view wx:if="{{!photos.length}}" class="photo-empty" bindtap="onPickPhotos" hover-class="cell-hover">
         <view class="empty-emoji">📸</view>
         <view class="empty-tip">上传第一张，定格我们的美好时光</view>
       </view>
 
-      <!-- 有照片：网格展示（封面已在顶部大图展示，小格子不再重复显示） -->
+      <!-- 有照片：网格展示全部照片 -->
       <view wx:elif="{{photos.length}}" class="photo-grid">
         <view
           class="photo-cell"
