@@ -3,7 +3,6 @@
 // 入参:
 //   action: 'addPhotos'  另传 { fileIDs: ['cloud://...', ...] }
 //   action: 'removePhoto' 另传 { fileID: 'cloud://...' }
-//   action: 'rename'      另传 { name: '新家庭名' }
 //   action: 'setWallTitle' 另传 { wallTitle: '...' }
 //   action: 'addAnniversary'    另传 { id, title, date }（新增一个纪念日）
 //   action: 'editAnniversary'   另传 { id, title, date }（编辑某个纪念日）
@@ -65,14 +64,6 @@ exports.main = async (event) => {
       try { await cloud.deleteFile({ fileList: [fileID] }); } catch (e) { console.error(e); }
     }
     return { code: 0, message: '已删除', data: { photos } };
-  }
-
-  // —— 修改家庭名 ——
-  if (action === 'rename') {
-    const name = (event.name || '').trim().slice(0, 20);
-    if (!name) return { code: -1, message: '家庭名不能为空' };
-    await famRef.update({ data: { name } });
-    return { code: 0, message: '已改名', data: { name } };
   }
 
   // —— 修改相片墙标题 ——

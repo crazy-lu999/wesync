@@ -3,25 +3,10 @@
   <view wx:if="{{!result}}" class="head">
     <view class="head-emoji">✨</view>
     <view class="head-title">创建家庭</view>
-    <view class="muted head-sub">给你们的清单起个名字吧</view>
+    <view class="muted head-sub">建一个只属于你们的小家</view>
   </view>
 
   <view wx:if="{{!result}}" class="form card">
-    <view class="field">
-      <view class="label">家庭名称</view>
-      <view class="input-wrap">
-        <text class="input-icon">🏷️</text>
-        <input
-          class="input-line"
-          data-field="familyName"
-          value="{{familyName}}"
-          bindinput="onInput"
-          placeholder="比如：我们的家"
-          maxlength="20"
-        />
-      </view>
-    </view>
-
     <view class="field">
       <view class="label">你的昵称（对方会看到）</view>
       <view class="input-wrap">

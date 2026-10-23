@@ -1,5 +1,5 @@
 // cloudfunctions/createFamily/index.js
-// 入参: { familyName, myNick }  返回: { code, message, data:{ inviteCode, familyId, openid } }
+// 入参: { myNick }  返回: { code, message, data:{ inviteCode, familyId, openid } }
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -20,7 +20,6 @@ async function uniqueCode() {
 
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
-  const familyName = (event.familyName || '我们的家').trim() || '我们的家';
   const myNick = (event.myNick || '我').trim() || '我';
 
   // 已在家庭中则直接返回现有家庭（避免重复创建）
@@ -38,7 +37,6 @@ exports.main = async (event) => {
   const now = db.serverDate();
   const { _id } = await db.collection('families').add({
     data: {
-      name: familyName,
       inviteCode,
       members: [OPENID],
       memberNicks: { [OPENID]: myNick },

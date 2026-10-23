@@ -18,35 +18,6 @@
   </block>
 
   <block wx:elif="{{family}}">
-    <!-- 家庭名卡：展示并可重命名（改名从首页挪来） -->
-    <view class="card fam-name-card">
-      <view class="fam-name-row" bindtap="onEditFamName" hover-class="cell-hover">
-        <view class="fam-name-icon">🏠</view>
-        <block wx:if="{{!editingFamName}}">
-          <view class="fam-name-text">
-            <view class="fam-name-label muted">我们的家</view>
-            <view class="fam-name-value">{{family.name}}</view>
-          </view>
-          <text class="fam-edit-chip">✎ 改名</text>
-        </block>
-      </view>
-      <view wx:if="{{editingFamName}}" class="fam-name-form">
-        <input
-          class="fam-name-input"
-          value="{{famNameInput}}"
-          focus
-          maxlength="20"
-          bindinput="onFamNameInput"
-          bindconfirm="onSaveFamName"
-          placeholder="给家起个名"
-        />
-        <view class="fam-name-form-actions">
-          <text class="muted fam-cancel" bindtap="onCancelFamName">取消</text>
-          <text class="save-btn" bindtap="onSaveFamName">保存</text>
-        </view>
-      </view>
-    </view>
-
     <!-- 相片墙卡：自定义上传照片展示（长按删除 / 点按查看） -->
     <view class="card">
       <view class="card-title">

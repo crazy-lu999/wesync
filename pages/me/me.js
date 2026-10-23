@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary, listFeedbacks, markFeedbackRead, renameFamily } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
 const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
@@ -73,9 +73,6 @@ Page({
     photos: [], // 云存储 fileID 列表
     photoUrls: [], // 与 photos 一一对应的临时可访问 URL（对方也能看图）
     gridPhotos: [], // 网格展示用：全部照片（含原始下标）
-    // 家庭名重命名
-    editingFamName: false,
-    famNameInput: '',
     // 相片墙设置
     photoMax: 9,
     photoWallTitle: config.PHOTO_WALL_TITLE,
@@ -202,37 +199,6 @@ Page({
       wx.hideLoading();
       this.setData({ editingNick: false, nickInput: '' });
       wx.showToast({ title: '已保存', icon: 'success' });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '保存失败', icon: 'none' });
-    }
-  },
-
-  // —— 家庭名重命名 ——
-  onEditFamName() {
-    this.setData({ famNameInput: this.data.family ? this.data.family.name : '', editingFamName: true });
-  },
-  onCancelFamName() {
-    this.setData({ editingFamName: false, famNameInput: '' });
-  },
-  onFamNameInput(e) {
-    this.setData({ famNameInput: e.detail.value });
-  },
-  async onSaveFamName() {
-    const name = (this.data.famNameInput || '').trim().slice(0, 20);
-    if (!name) {
-      wx.showToast({ title: '名称不能为空', icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '保存中' });
-    try {
-      await renameFamily(name);
-      const fresh = await getMyFamily();
-      app.globalData.family = fresh.family;
-      wx.setStorageSync('myFamily', fresh.family);
-      await this.applyFamily(fresh.family, fresh.openid, { editingFamName: false, famNameInput: '' });
-      wx.hideLoading();
-      wx.showToast({ title: '已改名', icon: 'success' });
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: e.message || '保存失败', icon: 'none' });

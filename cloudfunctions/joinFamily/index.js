@@ -1,5 +1,5 @@
 // cloudfunctions/joinFamily/index.js
-// 入参: { inviteCode, myNick }  返回: { code, message, data:{ familyId, familyName, openid } }
+// 入参: { inviteCode, myNick }  返回: { code, message, data:{ familyId, openid } }
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -21,7 +21,7 @@ exports.main = async (event) => {
     return {
       code: 0,
       message: '已在家庭中',
-      data: { familyId: f._id, familyName: f.name, openid: OPENID },
+      data: { familyId: f._id, openid: OPENID },
     };
   }
 
@@ -49,6 +49,6 @@ exports.main = async (event) => {
   return {
     code: 0,
     message: '加入成功',
-    data: { familyId: family._id, familyName: family.name, openid: OPENID },
+    data: { familyId: family._id, openid: OPENID },
   };
 };

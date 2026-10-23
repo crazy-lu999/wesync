@@ -5,7 +5,6 @@ const app = getApp();
 
 Page({
   data: {
-    familyName: '我们的家',
     myNick: '',
     submitting: false,
     result: null, // { inviteCode, familyId }
@@ -17,12 +16,11 @@ Page({
   },
 
   async onSubmit() {
-    const familyName = (this.data.familyName || '').trim() || '我们的家';
     const myNick = (this.data.myNick || '').trim() || '我';
     this.setData({ submitting: true });
     wx.showLoading({ title: '创建中' });
     try {
-      const data = await createFamily(familyName, myNick);
+      const data = await createFamily(myNick);
       wx.hideLoading();
       this.setData({ result: data });
       // 预填 globalData，回到 index 后会自动开 watch

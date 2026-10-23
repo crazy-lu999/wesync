@@ -17,7 +17,7 @@ function call(name, data = {}) {
 }
 
 // 家庭相关
-const createFamily = (familyName, myNick) => call('createFamily', { familyName, myNick });
+const createFamily = (myNick) => call('createFamily', { myNick });
 const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNick });
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
@@ -26,10 +26,9 @@ const submitFeedback = (content, nick) => call('submitFeedback', { content, nick
 // 反馈管理（家庭成员可见）：拉列表 / 标记已读
 const listFeedbacks = () => call('listFeedbacks', {});
 const markFeedbackRead = (id) => call('markFeedbackRead', { id });
-// 家庭照片墙 / 家庭名修改（服务端写）
+// 家庭照片墙 / 相片墙标题 / 纪念日（服务端写）
 const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos', fileIDs });
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
-const renameFamily = (name) => call('updateFamily', { action: 'rename', name });
 const setWallTitle = (wallTitle) => call('updateFamily', { action: 'setWallTitle', wallTitle });
 // 纪念日（可多个，各含标题+日期）：新增 / 编辑 / 删除
 const addAnniversary = (id, title, date) => call('updateFamily', { action: 'addAnniversary', id, title, date });
@@ -114,7 +113,6 @@ module.exports = {
   markFeedbackRead,
   addFamilyPhotos,
   removeFamilyPhoto,
-  renameFamily,
   setWallTitle,
   addAnniversary,
   editAnniversary,
