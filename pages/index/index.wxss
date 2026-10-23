@@ -39,7 +39,7 @@
 /* 亲密区：纪念日天数 + 窝心话 */
 .warm-card {
   display: flex; align-items: center; gap: 20rpx;
-  margin: 0 24rpx 6rpx; padding: 24rpx 28rpx;
+  margin: 24rpx 24rpx 24rpx; padding: 24rpx 28rpx;
   background: linear-gradient(120deg, #FFF3F0 0%, #FFE7DD 100%);
   border: 1rpx solid rgba(255, 111, 94, 0.14);
   border-radius: 26rpx;
