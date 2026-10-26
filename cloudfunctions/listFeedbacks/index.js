@@ -1,22 +1,16 @@
-// cloudfunctions/listFeedbacks/index.js
-// 返回: { code, data:{ list, unread } }
-// 拉取全平台所有用户的使用反馈（含昵称/内容/时间/已读），供「我的」页反馈管理查看。
-// 仅 ADMIN_OPENID（开发账户）可见；其它任何人（含家庭成员）一律拒绝。
+// cloudfunctions/listFeedbacks/index.js — 读取「建议墙」（全平台公开）
+// 返回: { code, data:{ list } }
+// 所有登录用户可见：开发者发版动态(type=update) + 全部用户建议(suggestion，含状态/回复)。
+// 出于隐私，不把他人 openid 下发；每条用 isMine 标记是否本人所发。
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
-// 开发账户 openid（唯一有权限查看反馈的人）
-const ADMIN_OPENID = 'oXz_0xVBfXW5p44Pn4vHs9CVYCVg';
+const LIMIT = 200;
 
-const LIMIT = 50;
-
-exports.main = async () => {
+exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext();
   if (!OPENID) return { code: -1, message: '未授权' };
-
-  // 仅开发账户可查看
-  if (OPENID !== ADMIN_OPENID) return { code: -1, message: '无权查看' };
 
   const res = await db.collection('feedbacks')
     .where({})
@@ -26,12 +20,16 @@ exports.main = async () => {
 
   const list = (res.data || []).map((r) => ({
     id: r._id,
-    nick: r.nick || '匿名',
+    // 动态由「开发组」发布；建议展示提交者昵称，匿名则显示「一位朋友」
+    nick: r.type === 'update' ? '开发组' : (r.nick || '一位朋友'),
+    avatar: (r.type === 'update' ? '' : (r.avatar || '')),
     content: r.content,
-    read: !!r.read,
+    type: r.type || 'suggestion',
+    status: r.status || 'new',
+    reply: r.reply || '',
     createdAt: r.createdAt,
+    isMine: r.openid === OPENID,
   }));
-  const unread = list.filter((x) => !x.read).length;
 
-  return { code: 0, data: { list, unread } };
+  return { code: 0, data: { list } };
 };

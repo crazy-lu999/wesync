@@ -1,0 +1,115 @@
+/* pages/wall/wall.wxml */
+<view class="page">
+
+  <!-- 顶部一句话轻声说明（替代原大横幅） -->
+  <view class="hero-strip">每一个建议都会被认真看，被采纳的会标上「已上线」</view>
+
+  <!-- 主加载 -->
+  <view wx:if="{{loading}}" class="loading muted">加载中…</view>
+
+  <block wx:else>
+
+    <!-- 最近一条版本更新 -->
+    <view wx:if="{{updates.length}}" class="section">
+      <view class="sec-title">最近更新</view>
+      <view class="update-card" wx:for="{{updates}}" wx:key="id">
+        <view class="update-dot"></view>
+        <view class="update-body">
+          <view class="update-content">{{item.content}}</view>
+          <view class="update-time">{{item.timeText}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 开发者发布动态（仅开发账户） -->
+    <view wx:if="{{isAdmin}}" class="section">
+      <view class="sec-head">
+        <view class="sec-title">管理</view>
+        <view class="admin-post-btn" bindtap="onTogglePost">{{postOpen ? '取消' : '＋ 发动态'}}</view>
+      </view>
+      <view wx:if="{{postOpen}}" class="admin-post-box">
+        <textarea class="admin-post-input" value="{{postInput}}" maxlength="120" auto-height placeholder="写一句这版改了什么…" bindinput="onPostInput"/>
+        <view class="wall-actions">
+          <view class="save-btn" bindtap="onPostSubmit">发布</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 呼声列表 -->
+    <view class="section">
+      <view class="sec-head">
+        <view class="sec-title">{{showMine ? '我提的建议' : '大家的声音'}}</view>
+        <view class="mine-toggle" bindtap="onToggleMine">{{showMine ? '查看全部' : '只看我的'}}</view>
+      </view>
+
+      <view wx:if="{{!suggestions.length}}" class="empty">
+        {{showMine ? '你还没提过建议，来写第一条吧' : '还没有建议，来当第一个发声的人'}}
+      </view>
+
+      <view class="sug-card" wx:for="{{suggestions}}" wx:key="id">
+        <!-- 头：仅头像 + 昵称 -->
+        <view class="sug-head">
+          <view class="sug-avatar">
+            <image wx:if="{{item.avatar}}" class="sug-avatar-img" src="{{item.avatar}}" mode="aspectFill" data-id="{{item.id}}" binderror="onSugAvatarError"/>
+            <text wx:else>{{item.nick ? item.nick[0] : '友'}}</text>
+          </view>
+          <view class="sug-nick">
+            <text>{{item.isMine ? '我' : item.nick}}</text>
+            <text wx:if="{{item.isMine}}" class="mine-tag">我的</text>
+          </view>
+        </view>
+
+        <view class="sug-content">{{item.content}}</view>
+
+        <!-- 底：状态(左) + 时间(右)，管理时多出操作 -->
+        <view class="sug-foot">
+          <view class="status-chip st-{{item.status}}" wx:if="{{isAdmin}}" bindtap="onStatusTap" data-id="{{item.id}}" data-status="{{item.status}}">
+            <view class="st-dot"></view>{{statusText[item.status]}}
+          </view>
+          <view class="status-chip st-{{item.status}}" wx:else>
+            <view class="st-dot"></view>{{statusText[item.status]}}
+          </view>
+          <view wx:if="{{isAdmin && targetId !== item.id}}" class="admin-op" bindtap="onStartReply" data-id="{{item.id}}">回复</view>
+          <view wx:if="{{isAdmin}}" class="admin-op danger" bindtap="onDelete" data-id="{{item.id}}">删除</view>
+          <view class="sug-time">{{item.timeText}}</view>
+        </view>
+
+        <!-- 开发者回复 -->
+        <view wx:if="{{item.reply}}" class="reply-box">
+          <view class="reply-tag">开发组</view>
+          <view class="reply-body">{{item.reply}}</view>
+        </view>
+
+        <!-- 回复编辑框（管理） -->
+        <view wx:if="{{isAdmin && targetId === item.id}}" class="reply-edit">
+          <input
+            class="reply-input"
+            focus
+            placeholder="给这条建议一个公开回应…"
+            maxlength="80"
+            data-id="{{item.id}}"
+            value="{{manageDrafts[item.id]}}"
+            bindinput="onReplyInput"
+          />
+          <view class="save-btn" bindtap="onSaveReply" data-id="{{item.id}}">发布</view>
+        </view>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- 底部固定提交框 -->
+  <view class="composer" catchtap="onFocus">
+    <input
+      class="composer-input"
+      value="{{input}}"
+      maxlength="{{max}}"
+      confirm-type="send"
+      bindinput="onInput"
+      bindconfirm="onSubmit"
+      placeholder="写下你的想法 / 想要的功能…"
+      placeholder-class="composer-ph"
+    />
+    <view class="composer-btn" bindtap="onSubmit">发声</view>
+  </view>
+</view>

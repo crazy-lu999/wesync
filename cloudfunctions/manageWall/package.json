@@ -1,7 +1,7 @@
 {
-  "name": "markFeedbackRead",
+  "name": "manageWall",
   "version": "1.0.0",
-  "description": "标记某条反馈为已读",
+  "description": "建议墙管理：状态/回复/删除/发动态",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

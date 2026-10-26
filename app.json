@@ -4,6 +4,7 @@
     "pages/create/create",
     "pages/join/join",
     "pages/me/me",
+    "pages/wall/wall",
     "pages/guide/guide"
   ],
   "window": {

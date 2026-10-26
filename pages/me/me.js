@@ -1,5 +1,5 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, submitFeedback, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary, listFeedbacks, markFeedbackRead } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, updateAvatar, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary } = require('../../utils/db.js');
 const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
@@ -24,9 +24,11 @@ function countdownDays(s) {
 function buildView(family, openid) {
   const memberNicks = (family && family.memberNicks) || {};
   const myNick = memberNicks[openid] || '我';
+  const memberAvatars = (family && family.memberAvatars) || {};
   const members = ((family && family.members) || []).map((o) => ({
     openid: o,
     nick: memberNicks[o] || '成员',
+    avatar: memberAvatars[o] || '',
     me: o === openid,
   }));
   const photos = (family && family.photos) || [];
@@ -38,6 +40,7 @@ function buildView(family, openid) {
     family: family || null,
     myOpenid: openid || '',
     myNick,
+    myAvatar: memberAvatars[openid] || '',
     members,
     photos,
     photoUrls,
@@ -92,16 +95,6 @@ Page({
     loading: true,
     editingNick: false,
     nickInput: '',
-    // 意见反馈
-    showFeedback: false,
-    feedbackInput: '',
-    feedbackMax: config.FEEDBACK_MAX_LEN,
-    // 反馈管理
-    showFeedbackList: false,
-    feedbackLoading: false,
-    feedbacks: [],
-    feedbackUnread: 0,
-    adminOpenid: config.ADMIN_OPENID,
     version: config.APP_VERSION,
   },
 
@@ -172,6 +165,8 @@ Page({
   onMemberTap(e) {
     if (e.currentTarget.dataset.me) this.onEditNick();
   },
+  // 阻挡头像按钮点击冒泡到成员行（避免换头像时误触发生弹昵称编辑）
+  noop() {},
 
   onEditNick() {
     this.setData({ nickInput: this.data.myNick || '', editingNick: true });
@@ -205,6 +200,39 @@ Page({
     }
   },
 
+  // 头像加载失败：回退显示首字母圆标（清掉该成员的 avatar）
+  onAvatarError(e) {
+    const idx = e.currentTarget.dataset.index;
+    const members = this.data.members || [];
+    if (idx == null || !members[idx] || !members[idx].avatar) return;
+    this.setData({ [`members[${idx}].avatar`]: '' });
+  },
+
+  // 点头像换头像：微信头像选择 → 上传云存储 → 保存到家庭 memberAvatars
+  async onChooseAvatar(e) {
+    const tempPath = e.detail && e.detail.avatarUrl;
+    if (!tempPath) return;
+    const openid = this.data.myOpenid || app.globalData.openid || wx.getStorageSync('myOpenid');
+    if (!openid) {
+      wx.showToast({ title: '请先加入家庭', icon: 'none' });
+      return;
+    }
+    wx.showLoading({ title: '上传中' });
+    try {
+      const ext = (tempPath.split('.').pop() || 'png').toLowerCase();
+      const cloudPath = `avatars/${openid}-${Date.now()}.${ext}`;
+      const up = await wx.cloud.uploadFile({ cloudPath, filePath: tempPath });
+      await updateAvatar(up.fileID);
+      // 刷新拿到最新家庭成员头像
+      await this.load();
+      wx.hideLoading();
+      wx.showToast({ title: '头像已更新', icon: 'success' });
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: err.message || '上传失败', icon: 'none' });
+    }
+  },
+
   onLeave() {
     wx.showModal({
       title: '退出家庭',
@@ -220,73 +248,6 @@ Page({
 
   goGuide() {
     wx.navigateTo({ url: '/pages/guide/guide' });
-  },
-
-  onFeedbackToggle() {
-    this.setData({ showFeedback: !this.data.showFeedback });
-  },
-
-  onFeedbackInput(e) {
-    this.setData({ feedbackInput: e.detail.value });
-  },
-
-  onFeedbackCancel() {
-    this.setData({ showFeedback: false, feedbackInput: '' });
-  },
-
-  async onFeedbackSubmit() {
-    const content = (this.data.feedbackInput || '').trim();
-    if (!content) {
-      wx.showToast({ title: '先写点反馈吧', icon: 'none' });
-      return;
-    }
-    if (content.length > this.data.feedbackMax) {
-      wx.showToast({ title: `反馈最多 ${this.data.feedbackMax} 字`, icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '提交中' });
-    try {
-      await submitFeedback(content, this.data.myNick);
-      wx.hideLoading();
-      this.setData({ showFeedback: false, feedbackInput: '' });
-      wx.showToast({ title: '感谢反馈 💛', icon: 'none' });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: e.message || '提交失败', icon: 'none' });
-    }
-  },
-
-  // —— 反馈管理 ——
-
-  async onFeedbackManage() {
-    const willShow = !this.data.showFeedbackList;
-    // 先置加载态：数据没回来前不要显示“空态”，避免误报“没有反馈”
-    this.setData({ showFeedbackList: willShow, feedbackLoading: willShow, feedbacks: [] });
-    if (willShow) await this.loadFeedbacks();
-  },
-
-  async loadFeedbacks() {
-    try {
-      const d = await listFeedbacks();
-      const feedbacks = (d.list || []).map((it) => ({ ...it, timeText: fmtTime(it.createdAt) }));
-      this.setData({ feedbacks, feedbackUnread: d.unread || 0, feedbackLoading: false });
-    } catch (e) {
-      this.setData({ feedbackLoading: false });
-      wx.showToast({ title: e.message || '加载失败', icon: 'none' });
-    }
-  },
-
-  async onFeedbackItemRead(e) {
-    const id = e.currentTarget.dataset.id;
-    const it = this.data.feedbacks.find((x) => x.id === id);
-    if (!it || it.read) return;
-    try {
-      await markFeedbackRead(id);
-      this.setData({
-        feedbacks: this.data.feedbacks.map((x) => (x.id === id ? { ...x, read: true } : x)),
-        feedbackUnread: Math.max(0, this.data.feedbackUnread - 1),
-      });
-    } catch (err) { /* 静默 */ }
   },
 
   // —— 相片墙 ——

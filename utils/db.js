@@ -22,10 +22,17 @@ const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNi
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
 const updateNickname = (nick) => call('updateNickname', { nick });
-const submitFeedback = (content, nick) => call('submitFeedback', { content, nick });
-// 反馈管理（家庭成员可见）：拉列表 / 标记已读
-const listFeedbacks = () => call('listFeedbacks', {});
-const markFeedbackRead = (id) => call('markFeedbackRead', { id });
+// 设置用户在家庭里的头像（微信头像经云存储上传后的 fileID）
+const updateAvatar = (fileID) => call('updateAvatar', { avatar: fileID });
+// 建议墙（公开）：提交一条公开建议（昵称与头像均存快照，避免随改名/改头像而变化）
+const submitFeedback = (content, nick, avatar) => call('submitFeedback', { content, nick, avatar });
+// 读取公开建议墙（开发者动态 + 全部建议，含状态/回复/isMine）
+const listWall = () => call('listFeedbacks', {});
+// 建议墙管理（仅开发账户）：标记状态/回复/删除/发动态
+const wallSetStatus = (id, status) => call('manageWall', { action: 'setStatus', id, status });
+const wallReply = (id, reply) => call('manageWall', { action: 'reply', id, reply });
+const wallDelete = (id) => call('manageWall', { action: 'delete', id });
+const wallPostUpdate = (content) => call('manageWall', { action: 'postUpdate', content });
 // 家庭照片墙 / 相片墙标题 / 纪念日（服务端写）
 const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos', fileIDs });
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
@@ -108,9 +115,13 @@ module.exports = {
   getMyFamily,
   leaveFamily,
   updateNickname,
+  updateAvatar,
   submitFeedback,
-  listFeedbacks,
-  markFeedbackRead,
+  listWall,
+  wallSetStatus,
+  wallReply,
+  wallDelete,
+  wallPostUpdate,
   addFamilyPhotos,
   removeFamilyPhoto,
   setWallTitle,

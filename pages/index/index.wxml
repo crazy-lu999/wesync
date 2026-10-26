@@ -45,10 +45,7 @@
         <view wx:if="{{annivInfo.nextLabel}}" class="warm-next-line">💍 {{annivInfo.nextLabel}}</view>
         <view wx:else class="warm-next-line link" bindtap="goMe">记下纪念日 🤍</view>
       </view>
-      <view class="me-btn" bindtap="goMe">
-        <text>我的</text>
-        <text class="chev">›</text>
-      </view>
+      <view class="wall-btn" bindtap="goWall">建议墙</view>
     </view>
 
     <view class="stat">
@@ -213,6 +210,13 @@
       class="petal"
       style="left:{{item.left}}%; font-size:{{item.size}}rpx; width:{{item.size}}rpx; height:{{item.size}}rpx; animation-duration:{{item.dur}}s; animation-delay:{{item.delay}}s; --drift:{{item.drift}}rpx; --rot:{{item.rotStart}}deg;"
     >{{item.emoji}}</view>
+  </view>
+
+  <!-- 整屏右下角悬浮「我的」入口（类似刷新悬浮钮） -->
+  <view wx:if="{{hasFamily}}" class="my-fab" bindtap="goMe" hover-class="my-fab-hover">
+    <view class="my-fab-heart">♥</view>
+    <view class="my-fab-icon">🏠</view>
+    <view class="my-fab-label">小家</view>
   </view>
 
 </view>

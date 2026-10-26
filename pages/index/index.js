@@ -885,6 +885,11 @@ Page({
     wx.navigateTo({ url: '/pages/me/me' });
   },
 
+  // 建议墙（与「我的」并列同级入口）
+  goWall() {
+    wx.navigateTo({ url: '/pages/wall/wall' });
+  },
+
   // —— 撒花庆祝动画 ——
   showCelebrate() {
     const emojis = ['🌸', '🎉', '✨', '💐', '🌷', '🌟', '💫'];

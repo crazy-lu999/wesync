@@ -148,7 +148,7 @@
       <view class="card-title">
         <text class="card-title-icon">👥</text>
         <text>家庭成员（{{members.length}}/2）</text>
-        <text wx:if="{{!editingNick}}" class="nick-hint">点自己可改名</text>
+        <text wx:if="{{!editingNick}}" class="nick-hint">点头像换头像 / 点名字可改名</text>
       </view>
       <view class="members">
         <view
@@ -159,7 +159,15 @@
           bindtap="onMemberTap"
           hover-class="member-hover"
         >
-          <view class="avatar {{item.me ? 'mine' : ''}}">{{item.nick ? item.nick[0] : '我'}}</view>
+          <button wx:if="{{item.me}}" class="avatar-picker" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar" catchtap="noop" aria-label="更换头像">
+            <image wx:if="{{item.avatar}}" class="avatar-img" src="{{item.avatar}}" mode="aspectFill" data-index="{{index}}" binderror="onAvatarError"/>
+            <text wx:else class="avatar-letter">{{item.nick ? item.nick[0] : '我'}}</text>
+            <view class="avatar-cam">📷</view>
+          </button>
+          <view wx:else class="avatar">
+            <image wx:if="{{item.avatar}}" class="avatar-img" src="{{item.avatar}}" mode="aspectFill" data-index="{{index}}" binderror="onAvatarError"/>
+            <text wx:else class="avatar-letter">{{item.nick ? item.nick[0] : '我'}}</text>
+          </view>
           <view class="m-name">{{item.nick}}</view>
           <view class="member-meta">
             <view wx:if="{{item.me}}" class="me-tag">我</view>
@@ -198,69 +206,6 @@
       <view class="help-right">
         <text class="muted">教 TA 怎么一起用</text>
         <text class="chev-plus">›</text>
-      </view>
-    </view>
-
-    <!-- 意见反馈入口 -->
-    <view class="card help-entry" hover-class="help-hover" bindtap="onFeedbackToggle">
-      <view class="help-left">
-        <text class="card-title-icon">💬</text>
-        <text class="help-label">意见反馈</text>
-      </view>
-      <view class="help-right">
-        <text class="muted">{{showFeedback ? '收起' : '告诉我们你的想法'}}</text>
-        <text class="chev-plus">›</text>
-      </view>
-    </view>
-
-    <!-- 反馈填写面板 -->
-    <view wx:if="{{showFeedback}}" class="card feedback-box">
-      <textarea
-        class="feedback-input"
-        value="{{feedbackInput}}"
-        maxlength="{{feedbackMax}}"
-        auto-height
-        placeholder="遇到问题？想要的功能？尽管说～"
-        placeholder-class="feedback-ph"
-        bindinput="onFeedbackInput"
-      />
-      <view class="feedback-meta muted">{{feedbackInput.length}}/{{feedbackMax}}</view>
-      <view class="feedback-actions">
-        <view class="copy-btn" bindtap="onFeedbackCancel">取消</view>
-        <view class="save-btn" bindtap="onFeedbackSubmit">提交</view>
-      </view>
-    </view>
-
-    <!-- 反馈管理入口（仅开发账户可见、可查看全量反馈） -->
-    <view wx:if="{{myOpenid && myOpenid === adminOpenid}}" class="card help-entry" hover-class="help-hover" bindtap="onFeedbackManage">
-      <view class="help-left">
-        <text class="card-title-icon">📋</text>
-        <text class="help-label">查看反馈</text>
-      </view>
-      <view class="help-right">
-        <text wx:if="{{feedbackUnread > 0}}" class="fb-badge">{{feedbackUnread}}条新</text>
-        <text class="muted">家人提交的反馈</text>
-        <text class="chev-plus">›</text>
-      </view>
-    </view>
-
-    <!-- 反馈列表 -->
-    <view wx:if="{{showFeedbackList}}" class="card feedback-list-box">
-      <view wx:if="{{feedbackLoading}}" class="fb-loading muted">加载中…</view>
-      <view wx:elif="{{!feedbacks.length}}" class="fb-empty muted">还没有反馈，去首页评论区逛逛吧～</view>
-      <view
-        wx:for="{{feedbacks}}"
-        wx:key="id"
-        class="fb-item {{item.read ? '' : 'fb-unread'}}"
-        bindtap="onFeedbackItemRead"
-        data-id="{{item.id}}"
-      >
-        <view class="fb-item-head">
-          <text class="fb-nick">{{item.nick}}</text>
-          <text class="fb-time muted">{{item.timeText}}</text>
-          <text wx:if="{{!item.read}}" class="fb-dot">●</text>
-        </view>
-        <view class="fb-content">{{item.content}}</view>
       </view>
     </view>
 

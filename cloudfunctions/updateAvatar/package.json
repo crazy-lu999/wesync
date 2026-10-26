@@ -1,0 +1,9 @@
+{
+  "name": "updateAvatar",
+  "version": "1.0.0",
+  "description": "设置用户在家庭里的头像（云存储 fileID）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

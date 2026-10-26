@@ -1,0 +1,162 @@
+/* pages/wall/wall.wxss — 建议墙（降噪版）*/
+.page {
+  min-height: 100vh;
+  padding: 20rpx 24rpx 200rpx;
+  box-sizing: border-box;
+  background: #F6F5F2;
+}
+.muted { color: #B5AFAA; font-size: 24rpx; }
+.loading { text-align: center; padding: 48rpx 0; font-size: 26rpx; color: #B5AFAA; }
+.empty { text-align: center; padding: 60rpx 24rpx; font-size: 26rpx; color: #B5AFAA; line-height: 1.7; }
+
+/* 顶部一行轻声说明：替代原大横幅 */
+.hero-strip {
+  margin-bottom: 20rpx;
+  padding: 16rpx 24rpx;
+  background: #FFF4EE;
+  color: #B07056;
+  font-size: 24rpx;
+  line-height: 1.6;
+  border-radius: 16rpx;
+  text-align: center;
+}
+
+/* 分区 */
+.section { margin-top: 12rpx; }
+.sec-title { font-size: 28rpx; font-weight: 700; color: #33302C; margin-bottom: 16rpx; }
+.sec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.sec-head .sec-title { margin-bottom: 0; }
+
+/* —— 最近更新 —— */
+.update-card {
+  background: #fff;
+  border-radius: 22rpx;
+  padding: 22rpx 26rpx;
+  display: flex; gap: 18rpx; align-items: flex-start;
+  box-shadow: 0 2rpx 12rpx rgba(80, 40, 20, 0.04);
+}
+.update-dot {
+  flex: none; width: 14rpx; height: 14rpx; margin-top: 12rpx;
+  border-radius: 50%; background: #FF9C6B;
+}
+.update-body { flex: 1; min-width: 0; }
+.update-content { font-size: 27rpx; color: #33302C; line-height: 1.5; }
+.update-time { margin-top: 8rpx; font-size: 22rpx; color: #B5AFAA; }
+
+/* —— 管理：发动态 —— */
+.admin-post-box {
+  background: #fff; border-radius: 22rpx; padding: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(80, 40, 20, 0.04);
+}
+.admin-post-input { width: 100%; font-size: 27rpx; min-height: 80rpx; }
+.admin-post-btn {
+  font-size: 24rpx; color: #FF7A59; font-weight: 600;
+  padding: 6rpx 18rpx; border: 1.5rpx solid #FF7A59; border-radius: 26rpx;
+}
+.wall-actions { display: flex; justify-content: flex-end; margin-top: 12rpx; }
+
+/* —— 建议卡片 —— */
+.sug-card {
+  background: #fff;
+  border-radius: 22rpx;
+  padding: 24rpx 26rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(80, 40, 20, 0.04);
+}
+.sug-head { display: flex; align-items: center; gap: 14rpx; }
+.sug-avatar {
+  flex: none; width: 58rpx; height: 58rpx;
+  background: #FFF0E9; color: #E8825F;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  font-weight: 700; font-size: 25rpx;
+}
+.sug-avatar-img { width: 100%; height: 100%; display: block; }
+.sug-avatar text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.sug-nick { display: flex; align-items: center; gap: 10rpx; font-size: 25rpx; font-weight: 600; color: #544C47; }
+.mine-tag {
+  font-size: 20rpx; color: #B07A60;
+  background: #F6EDE7; padding: 2rpx 12rpx; border-radius: 16rpx;
+  font-weight: 500;
+}
+.sug-content { margin-top: 14rpx; font-size: 28rpx; color: #33302C; line-height: 1.62; }
+
+/* 卡片底：状态(左) + 时间(右) */
+.sug-foot { margin-top: 18rpx; display: flex; align-items: center; gap: 14rpx; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 10rpx;
+  font-size: 22rpx; font-weight: 600;
+  padding: 6rpx 16rpx; border-radius: 999rpx;
+}
+.st-dot { width: 12rpx; height: 12rpx; border-radius: 50%; }
+/* 状态色统一：灰=已收录 / 橙=进行中 / 绿=已上线 */
+.st-new { color: #8C8784; background: #F2F0EE; }
+.st-new .st-dot { background: #B5AFAA; }
+.st-doing { color: #E8825F; background: #FFF1EB; }
+.st-doing .st-dot { background: #FF7A59; }
+.st-done { color: #5B9A68; background: #EEF7EF; }
+.st-done .st-dot { background: #6FBF7E; }
+
+.sug-time { margin-left: auto; font-size: 22rpx; color: #B5AFAA; flex: none; }
+.admin-op { font-size: 22rpx; color: #9A938E; padding: 4rpx 6rpx; }
+.admin-op.danger { color: #F0413B; }
+
+/* —— 开发者回复（浅灰底，弱化）—— */
+.reply-box {
+  margin-top: 16rpx;
+  background: #F7F5F2;
+  border-radius: 14rpx;
+  padding: 14rpx 18rpx;
+  display: flex; gap: 12rpx; align-items: flex-start;
+}
+.reply-tag {
+  flex: none;
+  font-size: 20rpx; color: #B5856E;
+  background: #FFF0E9; padding: 3rpx 12rpx; border-radius: 14rpx;
+  font-weight: 600;
+}
+.reply-body { flex: 1; font-size: 25rpx; color: #5A524C; line-height: 1.55; }
+
+/* 回复编辑 */
+.reply-edit { margin-top: 14rpx; display: flex; gap: 14rpx; align-items: center; }
+.reply-input {
+  flex: 1; background: #F7F5F2; border-radius: 14rpx;
+  padding: 14rpx 18rpx; font-size: 25rpx;
+}
+
+/* —— 通用按钮 —— */
+.save-btn {
+  font-size: 24rpx; color: #fff; background: #FF7A59;
+  padding: 8rpx 24rpx; border-radius: 26rpx; font-weight: 600; flex-shrink: 0;
+}
+
+/* —— "只看我的"切换 —— */
+.mine-toggle {
+  font-size: 23rpx; color: #9A938E; font-weight: 500;
+  padding: 4rpx 16rpx; border: 1.5rpx solid #E4DED9; border-radius: 24rpx;
+}
+.mine-toggle.mine-on { color: #FF7A59; border-color: #FFC9B7; background: #FFF4EE; }
+
+/* —— 底部固定提交框 —— */
+.composer {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding: 18rpx 24rpx calc(22rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(8px);
+  display: flex; gap: 16rpx; align-items: center;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
+}
+.composer-input {
+  flex: 1; background: #F3F1ED; border-radius: 30rpx;
+  padding: 16rpx 26rpx; font-size: 27rpx;
+}
+.composer-ph { color: #C4BFBC; }
+.composer-btn {
+  flex: none; background: #FF7A59; color: #fff;
+  font-size: 27rpx; font-weight: 700;
+  padding: 16rpx 30rpx; border-radius: 30rpx;
+}
