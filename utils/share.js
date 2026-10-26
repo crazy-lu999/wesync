@@ -11,8 +11,12 @@ const SHARE_TITLE = '和 TA 一起记小日常，点开建你们的小家 💕';
  * 构造品牌分享对象（onShareAppMessage 直接 return）
  * 参数为空设计：分享诉求只有一种——拉新家庭。伴侣绑定请走 app 内输邀请码流程。
  */
-function buildShare() {
-  return { title: SHARE_TITLE, path: '/pages/index/index', imageUrl: SHARE_IMAGE };
+function buildShare(opts) {
+  // 来电：带家庭空位邀请码时 → 落到加入页并预填邀请码，对方输个昵称即可加入（“一键加入”）；
+  // 否则（纯拉新/家庭已满）：回落通用品牌卡 → 首页，引导新用户建自己的小家。
+  const code = opts && opts.inviteCode ? String(opts.inviteCode).trim() : '';
+  const path = code ? `/pages/join/join?inviteCode=${code}` : '/pages/index/index';
+  return { title: SHARE_TITLE, path, imageUrl: SHARE_IMAGE };
 }
 
 module.exports = { buildShare };

@@ -122,7 +122,7 @@ Page({
         // 确认真实无家庭：清缓存回引导页
         this.clearCache(app.globalData.family && app.globalData.family._id);
         wx.reLaunch({ url: '/pages/index/index' });
-        return;
+        return true;
       }
       app.globalData.openid = openid;
       app.globalData.family = family;
@@ -130,10 +130,12 @@ Page({
       wx.setStorageSync('myFamily', family);
       wx.setStorageSync('myOpenid', openid);
       await this.applyFamily(family, openid, { loading: false });
+      return true;
     } catch (e) {
       // 网络失败但已有缓存时保留缓存内容，不打断浏览
       if (!this.data.family) this.setData({ loading: false });
       wx.showToast({ title: e.message || '加载失败', icon: 'none' });
+      return false;
     }
   },
 
@@ -142,10 +144,12 @@ Page({
     if (this._refreshing) return;
     this._refreshing = true;
     wx.showLoading({ title: '刷新中', mask: true });
-    this.load().finally(() => {
+    this.load().then((ok) => {
+      // 只有真刷新成功才提示；失败时 load 内部已弹「加载失败」，不覆盖误导
+      if (ok) wx.showToast({ title: '已刷新', icon: 'success' });
+    }).finally(() => {
       this._refreshing = false;
       wx.hideLoading();
-      wx.showToast({ title: '已刷新', icon: 'success' });
     });
   },
 
@@ -468,9 +472,14 @@ Page({
     }
   },
 
-  // 转发给朋友：统一品牌卡，引导新用户建自己的小家（分享诉求只有拉新家庭）
+  // 转发给朋友：本页是“我的小家”语境。家庭还有空位时，分享卡片直接带邀请码
+  // 跳加入页并预填（无需对方找码），真正实现“点开即可加入”；家庭已满或无码时
+  // 回落通用品牌卡（引导新用户建新家），避免“满员却还让你来加”的误导。
   onShareAppMessage() {
-    return buildShare();
+    const family = this.data.family;
+    const hasRoom = (this.data.members || []).length < 2;
+    const code = (family && family.inviteCode && hasRoom) ? family.inviteCode : '';
+    return buildShare({ inviteCode: code });
   },
 
   onShareTimeline() {
