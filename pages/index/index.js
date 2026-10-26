@@ -5,8 +5,6 @@ const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 // 版本号字符串 "1.2.3" → [1,2,3]；非数字片段按 0 处理
 function parseVersion(v) {
   return String(v == null || v === '' ? '0' : v)
@@ -457,6 +455,14 @@ Page({
   },
 
   renderTodos(todos) {
+    // 撤销窗口期内（删除/清空的 5s 里真是删除还没落库）：把待撤销条目的 id 从
+    // 服务端快照里再次剔除，避免 watch/轮询恰好在窗口内推来一版仍含这些条目的
+    // 快照，把它们重绘回来 → 用户看到的"先消失又回来、5s 后又消失"就是这个。《以下过滤》
+    if (this._undo && this._undo.pending && this._undo.pending.length) {
+      const pending = {};
+      this._undo.pending.forEach((p) => { if (p.todo && p.todo._id) pending[p.todo._id] = true; });
+      todos = todos.filter((t) => !pending[t._id]);
+    }
     const nicks = (this.data.family && this.data.family.memberNicks) || {};
     const my = this.data.myOpenid;
     const mapped = todos.map((t) => ({
@@ -508,6 +514,14 @@ Page({
     }
     const deadline = this.data.inputDeadline; // 先取日期，再清空状态
     const assignee = this.data.assignFor;      // 指派成员（openid）
+    // 备份草稿：云端失败时原样还回输入框，避免打一半的字被吞
+    const draft = {
+      inputVal: this.data.inputVal,
+      inputDeadline: this.data.inputDeadline,
+      inputDeadlineText: this.data.inputDeadlineText,
+      assignFor: this.data.assignFor,
+      assignForText: this.data.assignForText,
+    };
     this.setData({ inputVal: '', inputDeadline: '', inputDeadlineText: '', assignFor: '', assignForText: '👥 一起' });
     wx.showLoading({ title: '添加中' });
     try {
@@ -516,6 +530,7 @@ Page({
       wx.hideLoading();
     } catch (e) {
       wx.hideLoading();
+      this.setData(draft); // 失败：把草稿还给输入框，用户可重试而非重打
       wx.showToast({ title: e.message || '添加失败', icon: 'none' });
     }
   },
@@ -562,21 +577,24 @@ Page({
     if (!todo) return;
     const becomingDone = !todo.done;
     const prev = this.data.todos.slice();
-    // 乐观更新：先"原位"标记完成（不排序），让完成动画在这条卡片上原位播完
+    // 乐观更新：先"原位"标记完成，让勾选/划线动画在这张卡原位播一下
     this.setLocallyDone(todo._id, becomingDone);
+    // 立刻本地重排（完成→沉到底部 / 恢复→回到待办区）。用本地短定时器触发，
+    // 完全不等云端往返——以前是 await toggleTodo 云函数成功后才做，叠加出的 1~2s 卡顿就来自这里。
+    if (this._sinkTimer) clearTimeout(this._sinkTimer);
+    this._sinkTimer = setTimeout(() => {
+      this._sinkTimer = null;
+      this.sinkDone();
+    }, becomingDone ? 240 : 0); // 完成给勾选/划线动画留一点观感；恢复立即弹回
+    // 触感+撒花放乐观路径：点击即反馈，不拖到云端返回（网络慢也能立刻“咯噔”一下）
+    if (becomingDone) {
+      wx.vibrateShort({ type: 'light' });
+      this.showCelebrate();
+    }
     try {
       const r = (await toggleTodo(todo._id, becomingDone)) || {};
       this.suppressChange(todo._id);
-      // 完成：等完成动画（划线/缩放/勾选弹出）播完后，再把该条沉到列表底部
-      if (becomingDone) {
-        await sleep(480);
-        this.sinkDone();
-      }
       this.fetchTodos(); // 对齐服务端（早已按状态排好序，无额外视觉跳动）
-      if (becomingDone) { // 仅在"完成"时庆祝
-        wx.vibrateShort({ type: 'light' });
-        this.showCelebrate();
-      }
       // 里程碑：一起完成累计件数到 10/50/100… 时弹一次庆祝
       if (becomingDone) {
         const total = r.totalDone || 0;
@@ -586,6 +604,8 @@ Page({
         }
       }
     } catch (err) {
+      // 云端失败：取消待执行的重排，整体回滚到点之前的状态
+      if (this._sinkTimer) { clearTimeout(this._sinkTimer); this._sinkTimer = null; }
       this.setData({ todos: prev, doneCount: prev.filter((t) => t.done).length, activeCount: prev.filter((t) => !t.done).length });
       wx.showToast({ title: becomingDone ? '完成失败，请重试' : '恢复失败，请重试', icon: 'none' });
     }
