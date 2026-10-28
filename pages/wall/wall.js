@@ -1,7 +1,7 @@
 // pages/wall/wall.js — 建议墙（全平台公开）
 // 顶部：开发者发版动态（type=update）；下方：所有用户建议（带状态/回复，本人高亮）。
 // 底部固定提交框；开发账户额外获得管理能力（标记状态/回复/删除/发动态）。
-const { listWall, submitFeedback, wallSetStatus, wallReply, wallDelete, wallPostUpdate } = require('../../utils/db.js');
+const { listWall, submitFeedback, wallSetStatus, wallReply, wallDelete, wallPostUpdate, toggleWallLike } = require('../../utils/db.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -23,6 +23,7 @@ Page({
     suggestions: [],    // 用户建议
     allSug: [],         // 完整建议（未按“只看我的”过滤），供切换复用
     showMine: false,    // 只看我提的
+    isAnon: true,       // 匿名提交（默认不公开家里的昵称/头像）
     input: '',
     max: config.FEEDBACK_MAX_LEN,
     isAdmin: false,
@@ -103,9 +104,25 @@ Page({
       wx.showToast({ title: `建议最多 ${this.data.max} 字`, icon: 'none' });
       return;
     }
+    // 提交前二次确认：提示这条建议是全平台公开的
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: '建议将对所有人公开',
+        content: '你写的建议会显示在公开墙上，大家都能看到。请勿填写手机号、地址等个人隐私信息。确定发布吗？',
+        confirmText: '发布',
+        cancelText: '再想想',
+        success: (r) => resolve(r.confirm),
+        fail: () => resolve(false),
+      });
+    });
+    if (!ok) return;
+
     wx.showLoading({ title: '提交中' });
     try {
-      await submitFeedback(content, this.data.myNick, this.data.myAvatar);
+      // 匿名提交：不传昵称/头像，墙上一律显示「一位朋友」
+      const nick = this.data.isAnon ? '' : this.data.myNick;
+      const avatar = this.data.isAnon ? '' : this.data.myAvatar;
+      await submitFeedback(content, nick, avatar);
       this.setData({ input: '' });
       wx.hideLoading();
       wx.showToast({ title: '已收到，谢谢建议 💛', icon: 'none' });
@@ -114,6 +131,40 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: e.message || '提交失败', icon: 'none' });
     }
+  },
+
+  // 切换匿名提交（默认匿名，不自动带家里的昵称/头像）
+  onToggleAnon() {
+    this.setData({ isAnon: !this.data.isAnon });
+  },
+
+  // 点赞 / 取消点赞：按后端返回的最新状态同步到 allSug 与 suggestions 两套缓存
+  // 防连点：该条正在请求时忽略重复点击（_liking 忙碌标记）
+  async onLike(e) {
+    const id = e.currentTarget.dataset.id;
+    const row = (this.data.allSug || []).find((x) => x.id === id);
+    if (row && row._liking) return;
+    this.patchWall(id, { _liking: true });
+    try {
+      const d = await toggleWallLike(id);
+      this.patchWall(id, { isLiked: !!d.liked, likeCount: d.count });
+    } catch (err) {
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' });
+    } finally {
+      this.patchWall(id, { _liking: false });
+    }
+  },
+
+  // 局部更新某条建议的指定字段（控制 allSug / suggestions 同步）
+  patchWall(id, fields) {
+    const patch = {};
+    ['allSug', 'suggestions'].forEach((key) => {
+      const i = (this.data[key] || []).findIndex((x) => x.id === id);
+      if (i >= 0) {
+        Object.keys(fields).forEach((k) => { patch[`${key}[${i}].${k}`] = fields[k]; });
+      }
+    });
+    if (Object.keys(patch).length) this.setData(patch);
   },
 
   // —— “只看我提的”过滤 ——

@@ -254,6 +254,11 @@ Page({
     wx.navigateTo({ url: '/pages/guide/guide' });
   },
 
+  // 建议墙入口：提建议 / 看收录进度
+  goWall() {
+    wx.navigateTo({ url: '/pages/wall/wall' });
+  },
+
   // —— 相片墙 ——
 
   // 点击标题直接改为可编辑态

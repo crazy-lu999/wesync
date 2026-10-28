@@ -28,6 +28,8 @@ const updateAvatar = (fileID) => call('updateAvatar', { avatar: fileID });
 const submitFeedback = (content, nick, avatar) => call('submitFeedback', { content, nick, avatar });
 // 读取公开建议墙（开发者动态 + 全部建议，含状态/回复/isMine）
 const listWall = () => call('listFeedbacks', {});
+// 公开建议墙：点赞 / 取消点赞一条建议（返回最新 liked/count）
+const toggleWallLike = (id) => call('toggleWallLike', { id });
 // 建议墙管理（仅开发账户）：标记状态/回复/删除/发动态
 const wallSetStatus = (id, status) => call('manageWall', { action: 'setStatus', id, status });
 const wallReply = (id, reply) => call('manageWall', { action: 'reply', id, reply });
@@ -118,6 +120,7 @@ module.exports = {
   updateAvatar,
   submitFeedback,
   listWall,
+  toggleWallLike,
   wallSetStatus,
   wallReply,
   wallDelete,

@@ -18,18 +18,24 @@ exports.main = async (event) => {
     .limit(LIMIT)
     .get();
 
-  const list = (res.data || []).map((r) => ({
-    id: r._id,
-    // 动态由「开发组」发布；建议展示提交者昵称，匿名则显示「一位朋友」
-    nick: r.type === 'update' ? '开发组' : (r.nick || '一位朋友'),
-    avatar: (r.type === 'update' ? '' : (r.avatar || '')),
-    content: r.content,
-    type: r.type || 'suggestion',
-    status: r.status || 'new',
-    reply: r.reply || '',
-    createdAt: r.createdAt,
-    isMine: r.openid === OPENID,
-  }));
+  const list = (res.data || []).map((r) => {
+    const likes = Array.isArray(r.likes) ? r.likes : [];
+    return {
+      id: r._id,
+      // 动态由「开发组」发布；建议展示提交者昵称，匿名则显示「一位朋友」
+      nick: r.type === 'update' ? '开发组' : (r.nick || '一位朋友'),
+      avatar: (r.type === 'update' ? '' : (r.avatar || '')),
+      content: r.content,
+      type: r.type || 'suggestion',
+      status: r.status || 'new',
+      reply: r.reply || '',
+      createdAt: r.createdAt,
+      isMine: r.openid === OPENID,
+      // 点赞：只给计数与是否已赞，不下发完整 openid 数组（隐私）
+      likeCount: likes.length,
+      isLiked: likes.includes(OPENID),
+    };
+  });
 
   return { code: 0, data: { list } };
 };

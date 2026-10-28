@@ -209,6 +209,18 @@
       </view>
     </view>
 
+    <!-- 建议墙入口 -->
+    <view class="card help-entry" hover-class="help-hover" bindtap="goWall">
+      <view class="help-left">
+        <text class="card-title-icon">💡</text>
+        <text class="help-label">建议墙</text>
+      </view>
+      <view class="help-right">
+        <text class="muted">有想法告诉我，都会认真看</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
     <!-- 退出 -->
     <view class="card action-card">
       <button class="leave-btn" bindtap="onLeave">退出家庭</button>

@@ -71,7 +71,13 @@
           </view>
           <view wx:if="{{isAdmin && targetId !== item.id}}" class="admin-op" bindtap="onStartReply" data-id="{{item.id}}">回复</view>
           <view wx:if="{{isAdmin}}" class="admin-op danger" bindtap="onDelete" data-id="{{item.id}}">删除</view>
-          <view class="sug-time">{{item.timeText}}</view>
+          <view class="sug-right">
+            <view class="like-btn {{item.isLiked ? 'liked' : ''}} {{item._liking ? '_busy' : ''}}" bindtap="onLike" data-id="{{item.id}}" hover-class="like-hover">
+              <text class="like-ico">{{item.isLiked ? '❤️' : '🤍'}}</text>
+              <text class="like-num">{{item.likeCount || 0}}</text>
+            </view>
+            <view class="sug-time">{{item.timeText}}</view>
+          </view>
         </view>
 
         <!-- 开发者回复 -->
@@ -100,16 +106,22 @@
 
   <!-- 底部固定提交框 -->
   <view class="composer" catchtap="onFocus">
-    <input
-      class="composer-input"
-      value="{{input}}"
-      maxlength="{{max}}"
-      confirm-type="send"
-      bindinput="onInput"
-      bindconfirm="onSubmit"
-      placeholder="写下你的想法 / 想要的功能…"
-      placeholder-class="composer-ph"
-    />
-    <view class="composer-btn" bindtap="onSubmit">发声</view>
+    <view class="composer-row">
+      <input
+        class="composer-input"
+        value="{{input}}"
+        maxlength="{{max}}"
+        confirm-type="send"
+        bindinput="onInput"
+        bindconfirm="onSubmit"
+        placeholder="写下你的想法 / 想要的功能…"
+        placeholder-class="composer-ph"
+      />
+      <view class="composer-btn" bindtap="onSubmit">发声</view>
+    </view>
+    <view class="composer-foot">
+      <view class="anon-toggle {{isAnon ? 'on' : ''}}" bindtap="onToggleAnon">{{isAnon ? '🙈 匿名提交' : '🙂 显示我的昵称'}}</view>
+      <view class="privacy-hint">对所有人公开 · 别写隐私信息</view>
+    </view>
   </view>
 </view>

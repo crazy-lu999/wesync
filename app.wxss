@@ -23,7 +23,7 @@ view, text { box-sizing: border-box; }
   height: 96rpx;
   display: flex; align-items: center; justify-content: center;
   line-height: 1; padding: 0;
-  background: linear-gradient(135deg, #FF6F5E 0%, #FF917A 100%);
+  background: linear-gradient(135deg, #FF6F5E 0%, #FF8569 100%);
   box-shadow: 0 12rpx 28rpx rgba(255, 111, 94, 0.32);
   border: none;
   transition: transform 0.1s, opacity 0.1s;
@@ -70,4 +70,4 @@ view, text { box-sizing: border-box; }
 .input-line:focus { border-color: rgba(255, 111, 94, 0.4); }
 .input-line::-webkit-input-placeholder { color: #C4BFBC; }
 
-.muted { color: #A09B98; font-size: 26rpx; }
+.muted { color: #6E6865; font-size: 26rpx; }

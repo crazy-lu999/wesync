@@ -1,0 +1,9 @@
+{
+  "name": "toggleWallLike",
+  "version": "1.0.0",
+  "description": "公开建议墙：点赞 / 取消点赞一条建议（toggl，所有登录用户可用）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

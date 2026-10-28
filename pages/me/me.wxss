@@ -115,12 +115,12 @@
 .anniv-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 22rpx 26rpx;
-  background: linear-gradient(135deg, #FFF3F0, #FFE8E2);
-  border: 1rpx solid rgba(255, 124, 96, 0.16);
+  background: #F9F5F2;
+  border: 1rpx solid rgba(80, 40, 20, 0.06);
   border-radius: 18rpx;
 }
 .anniv-item-left { min-width: 0; }
-.anniv-item-title { font-size: 30rpx; font-weight: 700; color: #FF6F5E; word-break: break-all; }
+.anniv-item-title { font-size: 30rpx; font-weight: 700; color: #3A3533; word-break: break-all; }
 .anniv-item-date { margin-top: 6rpx; font-size: 23rpx; }
 .anniv-edit-chip {
   flex: none; margin-left: 16rpx;
@@ -301,6 +301,7 @@
 .version-foot { text-align: center; margin: 36rpx 0 60rpx; }
 
 /* 手动刷新悬浮按钮（右下角，可爱圆球） */
+/* P0：去掉无意义的 bob 常驻动画与顶部星光一闪，静置低调 */
 .refresh-fab {
   position: fixed; right: 30rpx; bottom: 64rpx; z-index: 60;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0rpx;
@@ -310,7 +311,6 @@
     0 12rpx 26rpx rgba(255, 111, 94, 0.42),
     inset 0 4rpx 8rpx rgba(255, 255, 255, 0.4),
     inset 0 -6rpx 12rpx rgba(180, 60, 40, 0.16);
-  animation: fabBob 2.8s ease-in-out infinite;
 }
 /* 左上角高光小圆点，更 Q */
 .refresh-fab::after {
@@ -319,25 +319,15 @@
   background: rgba(255, 255, 255, 0.55);
   transform: rotate(-30deg);
 }
-/* 右上角小星星，轻轻一闪 */
+/* 右上角小星星：静置点缀，不再常驻闪烁 */
 .refresh-spark {
   position: absolute; top: -4rpx; right: 0rpx;
   font-size: 28rpx; line-height: 1;
-  animation: sparkTwinkle 2.4s ease-in-out infinite;
 }
 .refresh-icon { font-size: 44rpx; line-height: 1; }
 .refresh-label { font-size: 18rpx; font-weight: 600; line-height: 1.2; }
-@keyframes fabBob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9rpx); }
-}
-@keyframes sparkTwinkle {
-  0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
-  50% { opacity: 0.45; transform: scale(0.72) rotate(20deg); }
-}
 .refresh-fab-hover {
   transform: scale(0.94); opacity: 0.9;
-  animation-play-state: paused;
 }
 
 /* 退出 */

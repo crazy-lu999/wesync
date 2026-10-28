@@ -45,7 +45,6 @@
         <view wx:if="{{annivInfo.nextLabel}}" class="warm-next-line">💍 {{annivInfo.nextLabel}}</view>
         <view wx:else class="warm-next-line link" bindtap="goMe">记下纪念日 🤍</view>
       </view>
-      <view class="wall-btn" bindtap="goWall">建议墙</view>
     </view>
 
     <view class="stat">
