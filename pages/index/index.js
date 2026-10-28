@@ -437,19 +437,28 @@ Page({
     const myOpenid = this.data.myOpenid;
     const prev = this._prevTodos || {};
     const emoji = { add: '➕', done: '🎉', undo: '↩️', edit: '✏️', important: '⭐' };
+    const byMe = (openid) => !!openid && openid === myOpenid;
     for (const t of todos) {
       const id = t._id;
       if (this._suppressed && this._suppressed[id] && Date.now() < this._suppressed[id]) continue;
-      const mine = t.creatorOpenid && t.creatorOpenid === myOpenid;
-      const isOther = !mine;
       const old = prev[id];
-      const nick = t.creatorNick || 'TA';
-      if (!old && isOther) this.showSyncTip(`${emoji.add} ${nick} 添加了「${t.content}」`);
-      else if (old && isOther) {
-        if (!old.done && t.done) this.showSyncTip(`${emoji.done} ${nick} 完成了「${t.content}」`);
-        else if (old.done && !t.done) this.showSyncTip(`${emoji.undo} 恢复了「${t.content}」`);
-        else if (!old.important && t.important) this.showSyncTip(`${emoji.important} ${nick} 把「${t.content}」标为重要`);
-        else if (old.content !== t.content) this.showSyncTip(`${emoji.edit} ${nick} 编辑了「${t.content}」`);
+      // 新增：按创建人判断是不是我
+      if (!old) {
+        if (!byMe(t.creatorOpenid)) this.showSyncTip(`${emoji.add} ${t.creatorNick || 'TA'} 添加了「${t.content}」`);
+        continue;
+      }
+      // 完成/恢复：按**完成人(doneBy)**判断是不是我
+      // （否则“我勾掉对方创建的待办”会被误播成“TA 完成了…”）
+      if (old.done !== t.done) {
+        if (!byMe(t.doneBy)) {
+          const nick = t.doneNick || t.creatorNick || 'TA';
+          this.showSyncTip(t.done ? `${emoji.done} ${nick} 完成了「${t.content}」`
+                                 : `${emoji.undo} 恢复了「${t.content}」`);
+        }
+      } else if (!old.important && t.important) {
+        if (!byMe(t.creatorOpenid)) this.showSyncTip(`${emoji.important} ${t.creatorNick || 'TA'} 把「${t.content}」标为重要`);
+      } else if (old.content !== t.content) {
+        if (!byMe(t.creatorOpenid)) this.showSyncTip(`${emoji.edit} ${t.creatorNick || 'TA'} 编辑了「${t.content}」`);
       }
     }
   },
@@ -588,7 +597,7 @@ Page({
     }, becomingDone ? 240 : 0); // 完成给勾选/划线动画留一点观感；恢复立即弹回
     // 触感+撒花放乐观路径：点击即反馈，不拖到云端返回（网络慢也能立刻“咯噔”一下）
     if (becomingDone) {
-      wx.vibrateShort({ type: 'light' });
+      try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 个别机型关闭震动会同步抛错，忽略 */ }
       this.showCelebrate();
     }
     try {
@@ -903,11 +912,6 @@ Page({
 
   goMe() {
     wx.navigateTo({ url: '/pages/me/me' });
-  },
-
-  // 建议墙（与「我的」并列同级入口）
-  goWall() {
-    wx.navigateTo({ url: '/pages/wall/wall' });
   },
 
   // —— 撒花庆祝动画 ——
