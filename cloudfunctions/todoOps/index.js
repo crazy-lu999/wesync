@@ -135,7 +135,13 @@ exports.main = async (event) => {
         } catch (e) { oldRemindAt = null; }
         data.remindAt = newRemindAt;
         if (Number(oldRemindAt || 0) !== Number(newRemindAt || 0)) {
-          data.reminded = false; // 提醒时刻变了才重新武装；只改内容则保留已提醒状态
+          // 提醒时刻变了才重新武装；只改内容则保留已提醒状态。
+          // ⚠️ 发送记账必须一并清零：上轮已发过的成员记在 remindSentTo 里，
+          // 不清的话 sendReminders 会把他们直接跳过——改时间后新提醒将静默不再发给任何人。
+          data.reminded = false;
+          data.remindSentTo = [];
+          data.remindTries = 0;
+          data.remindError = '';
         }
       }
       await db.collection('todos').doc(id).update({ data });
