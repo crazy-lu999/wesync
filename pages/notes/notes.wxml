@@ -1,0 +1,65 @@
+<!--pages/notes/notes.wxml-->
+<view class="page">
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="loading-box">
+    <view class="spinner"></view>
+  </view>
+
+  <block wx:else>
+    <!-- 顶部：标题 + 返回 + 写一条 -->
+    <view class="head">
+      <view class="head-left">
+        <view class="head-title">📒 我们的记录</view>
+        <view class="head-sub muted">想留的一句话，随手记下来</view>
+      </view>
+      <view class="compose-btn {{composing ? 'active' : ''}}" bindtap="onComposeTap">
+        {{composing ? '取消' : '✍️ 写一条'}}
+      </view>
+    </view>
+
+    <!-- 写/编辑输入框 -->
+    <view wx:if="{{composing}}" class="composer">
+      <textarea
+        class="composer-input"
+        value="{{input}}"
+        focus="{{inputFocus}}"
+        auto-height
+        maxlength="{{noteMax}}"
+        placeholder="记录点什么…"
+        bindinput="onInput"
+        cursor-spacing="120"
+        show-confirm-bar="{{false}}"
+      ></textarea>
+      <view class="composer-foot">
+        <text class="counter muted">{{input.length}}/{{noteMax}}</text>
+        <view class="save-btn" bindtap="onSave">{{editingId ? '保存' : '记下'}}</view>
+      </view>
+    </view>
+
+    <!-- 列表 -->
+    <view wx:if="{{!notes.length}}" class="empty">
+      <view class="empty-emoji">🌱</view>
+      <view class="muted">还没有记录，写一条看看</view>
+    </view>
+
+    <view wx:else class="note-list">
+      <view
+        class="note-card"
+        wx:for="{{notes}}"
+        wx:key="_id"
+        data-id="{{item._id}}"
+        bindlongpress="onNoteLongPress"
+        hover-class="note-card-hover"
+      >
+        <view class="note-content">{{item.content}}</view>
+        <view class="note-meta">
+          <text class="muted">{{item.timeText}}</text>
+          <text wx:if="{{!item.mine}}" class="muted from">· {{item.creatorNick || 'TA'}}</text>
+        </view>
+      </view>
+      <view class="muted hint">长按记录可编辑 / 转回待办 / 删除</view>
+    </view>
+  </block>
+
+</view>

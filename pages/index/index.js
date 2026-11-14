@@ -1,5 +1,5 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, clearDoneTodos, subscribeTodos, requestTodoReminder } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, clearDoneTodos, convertTodo, subscribeTodos, requestTodoReminder } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
 const { buildShare } = require('../../utils/share.js');
 const { getLocalRelease } = require('../../utils/release-notes.js');
@@ -140,6 +140,7 @@ Page({
     doneCount: 0,
     totalDone: 0, // 你们一起累计完成的件数（里程碑）
     weeklyDone: 0, // 这周一起完成的件数（周小结）
+    noteCount: 0, // 已存笔记条数（首页「我们的记录」入口展示）
     dailyPhrase: '', // 今天的一句窝心话
     annivInfo: { nextLabel: '' }, // 最近一场纪念日倒计时
     syncTip: '', // 语义化同步提示（TA 刚完成了…）
@@ -477,6 +478,7 @@ Page({
         const list = todos || [];
         this.announceChanges(list);
         this.renderTodos(list);
+        this.setData({ noteCount: list.filter((t) => t.isNote).length });
         if (this.data.syncMode !== 'realtime') this.setData({ syncMode: 'realtime' });
       },
       (err) => this.onWatchUnavailable(err)
@@ -561,7 +563,7 @@ Page({
       if (this._inited) this.announceChanges(list);
       this.renderTodos(list); // 内部会把快照写进缓存，下次进入秒显
       this._inited = true;
-      this.setData({ todosReady: true });
+      this.setData({ todosReady: true, noteCount: list.filter((t) => t.isNote).length });
       return true;
     } catch (e) {
       this.setData({ subscribing: false });
@@ -579,6 +581,7 @@ Page({
     const emoji = { add: '➕', done: '🎉', undo: '↩️', edit: '✏️', important: '⭐' };
     const byMe = (openid) => !!openid && openid === myOpenid;
     for (const t of todos) {
+      if (t.isNote) continue; // 笔记不进待办的语义化播报
       const id = t._id;
       if (this._suppressed && this._suppressed[id] && Date.now() < this._suppressed[id]) continue;
       const old = prev[id];
@@ -609,14 +612,18 @@ Page({
     //    会把已删除的条目又画回来一次，然后才消失，看起来非常诡异。
     todos = this._filterHidden(todos);
     const my = this.data.myOpenid;
-    const mapped = todos.map((t) => ({
+    // ② 先把笔记(随笔)拆出去：它是待办的姊妹数据，共享同一条 todos 集合与实时同步，
+    //    但不进首页待办列表——首页只渲染 isNote 非真的。
+    //    noteCount 由 fetchTodos / watch 全量来源单独维护（本函数常收到待办子集，不宜在此计数）。
+    const todoList = todos.filter((t) => !t.isNote);
+    const mapped = todoList.map((t) => ({
       ...t,
       timeText: fmtTime(t.createTime),
       doneTimeText: fmtTime(t.doneTime),
       mine: t.creatorOpenid === my,
       remindText: fmtRemind(t.remindAt), // 卡片提醒徽标文案
     }));
-    // ② 刚勾选/取消的条目：短窗口内以本地状态为准，避免“完成后跳回未完成、再跳回去”的闪动
+    // ③ 刚勾选/取消的条目：短窗口内以本地状态为准，避免“完成后跳回未完成、再跳回去”的闪动
     this._applyOptimistic(mapped);
     // 未完成在前（重要在前），已完成沉底；同优先级按创建时间倒序
     mapped.sort((a, b) => this.cmpTodos(a, b));
@@ -625,7 +632,7 @@ Page({
     this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount, weeklyDone });
     // 快照落缓存：下次冷启动首屏秒显（本地增删改后也保持一致）
     this._cacheTodos(mapped);
-    // 记录本次快照，供 announceChanges 做同源对比
+    // 记录本次快照（仅待办），供 announceChanges 做同源对比
     this._prevTodos = {};
     mapped.forEach((t) => { this._prevTodos[t._id] = { done: !!t.done, content: t.content, important: !!t.important }; });
   },
@@ -943,13 +950,35 @@ Page({
     if (!todo) return;
     const markLabel = todo.important ? '⭐ 取消重要' : '⭐ 设为重要';
     wx.showActionSheet({
-      itemList: [markLabel, '✏️ 编辑', '🗑️ 删除'],
+      itemList: [markLabel, '📒 转为记录', '✏️ 编辑', '🗑️ 删除'],
       success: (res) => {
         if (res.tapIndex === 0) this.onToggleImportant(e);
-        else if (res.tapIndex === 1) this.onEnterEdit(e);
-        else if (res.tapIndex === 2) this.onDeleteTodo(e);
+        else if (res.tapIndex === 1) this.onConvertToNote(e);
+        else if (res.tapIndex === 2) this.onEnterEdit(e);
+        else if (res.tapIndex === 3) this.onDeleteTodo(e);
       },
     });
+  },
+
+  // 把一条待办转成笔记（随笔）：从首页待办列表移除，进「我们的记录」区。
+  async onConvertToNote(e) {
+    const todo = this.findTodo(e);
+    if (!todo) return;
+    const prev = this.data.todos.map((t) => ({ ...t }));
+    // 乐观：先从本地待办列表拿掉，转好后由 watch/刷新在笔记页呈现
+    this._hideTodoIds([todo._id]);
+    this.renderTodos(this.data.todos.filter((t) => t._id !== todo._id));
+    wx.showToast({ title: '已转为记录', icon: 'none' });
+    try {
+      await convertTodo(todo._id, true);
+      this.suppressChange(todo._id);
+      this._unhideTodoIds([todo._id]);
+      this.setData({ noteCount: (this.data.noteCount || 0) + 1 });
+    } catch (err) {
+      this._unhideTodoIds([todo._id]);
+      this.renderTodos(prev);
+      wx.showToast({ title: '转换失败，请重试', icon: 'none' });
+    }
   },
 
   // 标记/取消重要
@@ -1239,6 +1268,10 @@ Page({
 
   goMe() {
     wx.navigateTo({ url: '/pages/me/me' });
+  },
+
+  goNotes() {
+    wx.navigateTo({ url: '/pages/notes/notes' });
   },
 
   // —— 撒花庆祝动画 ——

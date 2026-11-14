@@ -78,6 +78,16 @@
       <text wx:if="{{doneCount}}" class="clear-done" bindtap="onClearDone">清空已完成</text>
     </view>
 
+    <!-- 我们的记录入口：随笔/转成记录都进这里，和待办/已完成同层级，顺手可见 -->
+    <view class="notes-card" bindtap="goNotes" hover-class="notes-card-hover">
+      <view class="notes-card-icon">📒</view>
+      <view class="notes-card-body">
+        <view class="notes-card-title">我们的记录</view>
+        <view class="notes-card-sub">想留的一句话，随手记下来 · 已存 {{noteCount}} 条</view>
+      </view>
+      <view class="notes-card-arrow">›</view>
+    </view>
+
     <view wx:if="{{todosReady && todos.length === 0}}" class="empty">
       <view class="empty-emoji">📝</view>
       <view class="muted">还没有待办，加一条吧</view>
