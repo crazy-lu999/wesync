@@ -1,14 +1,18 @@
 // utils/config.js — 运行时配置
 module.exports = {
   // 应用版本号：发版时请同步更新这里（会展示在「我的」页底部与「使用说明」页）
-  APP_VERSION: '1.0.15',
-  // 建议墙：单条建议字数上限（需与 cloudfunctions/submitFeedback/index.js 的 MAX_LEN 一致）
+  APP_VERSION: '1.0.16',
+  // 意见反馈：单条字数上限（需与 cloudfunctions/submitFeedback/index.js 的 MAX_LEN 一致）
   FEEDBACK_MAX_LEN: 300,
+  // 开发者 openid：仅用于「我的」页显示「反馈管理」入口。
+  // 真正的权限校验在云函数 adminFeedback 内（服务端按 OPENID 判断），客户端改配置也无法越权。
+  ADMIN_OPENID: 'oXz_0xVBfXW5p44Pn4vHs9CVYCVg',
   // 相片墙卡片标题（可自定义成你们喜欢的名字）
   PHOTO_WALL_TITLE: '美好时光',
-  // 开发账户 openid：只有他能管理「建议墙」（标记状态/回复/删除/发布发版动态）
-  //（仅控制前端管理入口显隐；真正的权限门槛在云函数 manageWall 里）
-  ADMIN_OPENID: 'oXz_0xVBfXW5p44Pn4vHs9CVYCVg',
+  // 待办到期提醒（订阅消息）。上线前：
+  //  1) 小程序后台申请「待办提醒」订阅模板，审核通过后把 Template ID 填到 REMIND_TMPL_ID；
+  //  2) 字段名须与 cloudfunctions/sendReminders/index.js 的 REMIND_FIELDS 对应。
+  REMIND_TMPL_ID: 'HmGE2NE95U_iq4pbEMlbq27Zx-oqc9II7vu38vQTUNg', // 「待办提醒」订阅模板 Template ID
   // 空态引导：首页没有待办时提供的一键填充示例模板
   TODO_TEMPLATES: [
     '去超市买点牛奶和水果',

@@ -34,10 +34,17 @@ exports.main = async (event) => {
     return { code: 3, message: '家庭已满员（最多 2 人）' };
   }
 
+  // ⚠️ memberNicks 必须「读出旧值 → 合并自己 → 整体写回」。
+  // 直接写 { [OPENID]: myNick } 会把整个字段覆盖掉，导致先建家庭的 A 昵称丢失（显示成“成员”）。
+  const memberNicks = (family.memberNicks && typeof family.memberNicks === 'object' && !Array.isArray(family.memberNicks))
+    ? family.memberNicks
+    : {};
+  memberNicks[OPENID] = myNick;
+
   await db.collection('families').doc(family._id).update({
     data: {
       members: _.push([OPENID]),
-      memberNicks: { [OPENID]: myNick },
+      memberNicks,
     },
   });
 

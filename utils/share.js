@@ -1,22 +1,24 @@
-// utils/share.js — 品牌分享卡片（统一一张卡，一律引导新用户建新家）
-// 本小程序的产品增长方向：靠"晒记录"吸引新的家庭来用。
-// 所以无论谁、在哪个页面分享，都用同一张品牌卡，终点都指向首页，
-// 让还没用过的用户点开 → 自己创建新家庭 → 再各自邀自己的伴侣（绑定走 app 内输码流程）。
+// utils/share.js — 分享卡片
+// 两种语境，文案分开，都控制在 10 字内（微信卡片标题过长会被截断成「…」）：
+//  ① 带邀请码（家庭还有空位）：邀请另一半加入 → 落到加入页并预填邀请码
+//  ② 不带邀请码（拉新 / 家庭已满）：通用品牌卡 → 首页，引导新用户建自己的小家
+//
+// 预览图说明：不传 imageUrl，由微信自动截取当前页面作为卡片图。
+// 若要换回自定义图，只需 return 里补上 imageUrl（建议 5:4、750×600、文字居中留足边距、不用 emoji）。
 
-// 分享卡片统一预览图（微信分享时会显示在小卡片上）与统一文案
-const SHARE_IMAGE = '/images/share_card.png';
-const SHARE_TITLE = '和 TA 一起记小日常，点开建你们的小家 💕';
+// ① 邀请卡：对方点开就能加入
+const TITLE_INVITE = '点开加入小家 💕';
+// ② 品牌卡：拉新
+const TITLE_BRAND = '一起记小日常 💕';
 
 /**
- * 构造品牌分享对象（onShareAppMessage 直接 return）
- * 参数为空设计：分享诉求只有一种——拉新家庭。伴侣绑定请走 app 内输邀请码流程。
+ * 构造分享对象（onShareAppMessage 直接 return）
+ * @param {{ inviteCode?: string }} opts
  */
 function buildShare(opts) {
-  // 来电：带家庭空位邀请码时 → 落到加入页并预填邀请码，对方输个昵称即可加入（“一键加入”）；
-  // 否则（纯拉新/家庭已满）：回落通用品牌卡 → 首页，引导新用户建自己的小家。
   const code = opts && opts.inviteCode ? String(opts.inviteCode).trim() : '';
   const path = code ? `/pages/join/join?inviteCode=${code}` : '/pages/index/index';
-  return { title: SHARE_TITLE, path, imageUrl: SHARE_IMAGE };
+  return { title: code ? TITLE_INVITE : TITLE_BRAND, path };
 }
 
 module.exports = { buildShare };

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "更新日志",
+  "navigationBarBackgroundColor": "#FF7A59",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#F6F5F2",
+  "enablePullDownRefresh": true
+}

@@ -1,0 +1,87 @@
+/* pages/adminFeedback/adminFeedback.wxss — 反馈管理（仅开发者本人）*/
+.page {
+  min-height: 100vh;
+  padding: 20rpx 0 60rpx;
+  box-sizing: border-box;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 80rpx 40rpx;
+  text-align: center;
+}
+.state-emoji { font-size: 72rpx; line-height: 1; }
+.state-title { font-size: 32rpx; font-weight: 700; color: #2A2626; }
+.state-sub { font-size: 24rpx; line-height: 1.6; }
+
+.stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 8rpx 24rpx 0;
+  padding: 20rpx 28rpx;
+  background: #FFF4EE;
+  border-radius: 18rpx;
+  color: #8C5B45;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+.stat-bar .unread { color: #FF6F5E; }
+.stat-bar .refresh {
+  margin-left: auto;
+  color: #FF6F5E;
+  padding: 6rpx 20rpx;
+  background: #fff;
+  border-radius: 999rpx;
+}
+
+.list { padding-bottom: 20rpx; }
+.fb-card { margin: 20rpx 24rpx; padding: 28rpx; }
+.fb-card.read { opacity: 0.72; }
+
+.fb-content {
+  font-size: 30rpx;
+  line-height: 1.65;
+  color: #2A2626;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.content-hover { opacity: 0.7; }
+
+.fb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 22rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid #F3EFED;
+}
+.fb-meta { display: flex; align-items: center; gap: 12rpx; min-width: 0; }
+.dot {
+  width: 14rpx; height: 14rpx; border-radius: 50%;
+  background: #FF6F5E;
+  flex: none;
+}
+.time, .user { font-size: 22rpx; color: #A9A19C; }
+.user { color: #B58A76; }
+
+.fb-ops { display: flex; align-items: center; gap: 12rpx; flex: none; }
+.op {
+  font-size: 23rpx;
+  color: #FF6F5E;
+  background: #FFF1EC;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+}
+.op.danger { color: #F0413B; background: #FFF0EE; }
+
+.hint {
+  text-align: center;
+  font-size: 22rpx;
+  padding: 24rpx 0;
+}

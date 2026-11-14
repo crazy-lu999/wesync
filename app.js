@@ -1,7 +1,10 @@
 // app.js
+const config = require('./utils/config.js');
+
 App({
   onLaunch() {
     this.checkUpdate();
+    this.checkRemindSetting();
 
     if (!wx.cloud) {
       console.error('请用 2.2.3 或以上基础库以使用云开发');
@@ -47,11 +50,29 @@ App({
     });
   },
 
+  // 读取订阅消息的用户选择，用于判断能否「静默续额度」：
+  // 用户勾选「总是保持以上选择」后，itemSettings[模板] === 'accept'，
+  // 此时再调 requestSubscribeMessage 不会弹窗，可无人感知地 +1 条额度。
+  checkRemindSetting() {
+    const tmplId = (config.REMIND_TMPL_ID || '').trim();
+    if (!tmplId || !wx.getSetting) return;
+    wx.getSetting({
+      withSubscriptions: true,
+      success: (res) => {
+        const item = (res.subscriptionsSetting && res.subscriptionsSetting.itemSettings) || {};
+        this.globalData.remindTmplAccept = item[tmplId] === 'accept';
+      },
+      fail: () => { /* 忽略 */ },
+    });
+  },
+
   globalData: {
     openid: null,
     family: null, // { _id, name, inviteCode, members, memberNicks, ... }
     hasUpdate: false, // 线上是否有新版本（由 onCheckForUpdate 自动写入）
     updateReady: false, // 新版本是否已下载完成（由 onUpdateReady 自动写入）
     updateDialogShown: false, // 热启动已弹窗提醒一张卡，首页横幅据此让位不重复
+    remindTmplAccept: false, // 用户是否对提醒模板选了「总是保持以上选择」（可静默续额度）
+    latestRelease: null, // 云端最新版本说明 { version, title, notes, releasedAt }
   },
 });

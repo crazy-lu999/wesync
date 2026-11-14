@@ -35,7 +35,16 @@
   "condition": {},
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "cloudfunctions/toggleWallLike" },
+      { "type": "folder", "value": "cloudfunctions/manageWall" },
+      { "type": "folder", "value": "cloudfunctions/listFeedbacks" },
+      { "type": "folder", "value": "cloudfunctions/markFeedbackRead" },
+      { "type": "folder", "value": "images" },
+      { "type": "file", "value": "README.md" },
+      { "type": "file", "value": "RELEASE_CHECKLIST.md" },
+      { "type": "file", "value": "cleanup.bat" }
+    ],
     "include": []
   },
   "editorSetting": {}

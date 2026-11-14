@@ -1,7 +1,7 @@
 {
-  "name": "manageWall",
+  "name": "sendReminders",
   "version": "1.0.0",
-  "description": "建议墙管理：状态/回复/删除/发动态",
+  "description": "待办自定义时刻提醒定时触发器",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

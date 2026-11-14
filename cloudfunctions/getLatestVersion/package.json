@@ -1,7 +1,7 @@
 {
   "name": "getLatestVersion",
   "version": "1.0.0",
-  "description": "返回应用最新版本号，供首页横幅兜底提醒（极端热启动场景）",
+  "description": "返回应用最新版本号 + 更新说明（横幅预览 / 更新日志）",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "~2.6.3"

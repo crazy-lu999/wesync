@@ -55,15 +55,6 @@
 }
 .warm-next-line.link { color: #FF9A7A; }
 
-/* 底部「指派给谁」chip：与日期 chip 同风格 */
-.assign-chip {
-  flex: none; height: 60rpx; line-height: 60rpx; box-sizing: border-box;
-  padding: 0 16rpx; border-radius: 999rpx; font-size: 23rpx; font-weight: 600;
-  background: #F4F2F1; color: #8C8784; white-space: nowrap;
-  border: 1rpx solid rgba(0, 0, 0, 0.04);
-}
-.assign-chip.set { background: #FFF0EC; color: #FF6F5E; border-color: rgba(255, 111, 94, 0.3); }
-.assign-hover { opacity: 0.7; }
 
 /* 统计卡 */
 .stat {
@@ -102,6 +93,33 @@
 .update-banner-text { font-size: 28rpx; font-weight: 600; line-height: 1.4; }
 .update-banner-arrow { font-size: 36rpx; font-weight: 600; opacity: 0.9; }
 .update-banner-hover { opacity: 0.88; }
+
+/* 提醒授权引导条（没授权过微信提醒时出现，可关闭） */
+.remind-guide {
+  display: flex; align-items: center; gap: 14rpx;
+  margin: 16rpx 24rpx 0; padding: 18rpx 22rpx;
+  background: #FFF7EC;
+  border: 1rpx solid rgba(255, 160, 60, 0.28);
+  border-radius: 18rpx;
+  animation: tipIn 0.3s ease;
+}
+.remind-guide-emoji { flex: none; font-size: 32rpx; line-height: 1; }
+.remind-guide-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4rpx; }
+.remind-guide-title { font-size: 27rpx; font-weight: 700; color: #B4690E; }
+.remind-guide-sub { font-size: 21rpx; color: #A6865A; line-height: 1.4; }
+.remind-guide-x {
+  flex: none; width: 44rpx; height: 44rpx; border-radius: 50%;
+  background: rgba(180, 105, 14, 0.1); color: #B4690E;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22rpx;
+}
+
+/* 选完提醒时间但还没授权时的行内提示 */
+.remind-hint {
+  flex: 1 1 100%;
+  font-size: 21rpx; color: #B4690E; line-height: 1.4;
+  padding: 8rpx 4rpx 0;
+}
 
 /* 顶部语义化同步事件提示条 */
 .sync-event-tip {
@@ -345,14 +363,20 @@
 }
 
 .input-bar {
-  display: flex; align-items: center; gap: 16rpx;
   padding: 20rpx 24rpx;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: saturate(180%) blur(20rpx);
   border-top: 1rpx solid rgba(0, 0, 0, 0.04);
 }
-/* 新建态日期 chip 紧跟输入框 */
-.input-bar .cd-picker { margin-right: 4rpx; }
+/* 输入行：输入框 + 添加按钮，始终完整可见 */
+.input-row {
+  display: flex; align-items: center; gap: 16rpx;
+}
+/* 提醒/指派等选项：独立一行，可换行，不再挤压输入框和添加按钮 */
+.input-chips {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx;
+  margin-top: 16rpx;
+}
 
 /* 编辑态面板：原内容 + 输入框 + 操作按钮纵向堆叠，输入框不再被按钮挤压 */
 .edit-panel { padding: 28rpx 28rpx 24rpx; }
@@ -369,7 +393,7 @@
 }
 .edit-close:active { background: #ECE7E4; }
 
-.input-bar .input-line { flex: 1; }
+.input-row .input-line { flex: 1; min-width: 0; }
 /* textarea 多行输入：给个最小高度不至于太扁，过长可自动增高至合理高度 */
 .input-bar textarea.input-line {
   min-height: 48rpx;
@@ -417,12 +441,6 @@
 .add-btn.disable { background: #E8E3E0; color: #C4BFBC; box-shadow: none; }
 .add-btn.edit { padding: 0 44rpx; }
 
-/* 待办指派徽标：跟创建人小胶囊并列 */
-.assign-tag {
-  background: #FFEFEA; color: #FF6F5E; padding: 4rpx 16rpx; border-radius: 999rpx;
-  font-size: 22rpx; font-weight: 600;
-}
-.assign-tag.mine { background: #FFE7E0; color: #FF6F5E; }
 /* 底部常态(新建)输入栏的添加按钮：紧凑小胶囊，不占宽；编辑态大按钮不受影响 */
 .input-bar .add-btn {
   flex: 0 0 auto;
@@ -437,35 +455,102 @@
   box-sizing: border-box;
 }
 
-/* 整屏右下角悬浮「我的」：蜜桃奶油粉，怦然的爱心，迎合女主人审美 */
-/* P0：去掉无意义上下浮动，只保留心跳（唯一常驻动效），静止更聚焦 */
-.my-fab {
-  position: fixed; right: 28rpx; bottom: 148rpx; z-index: 60;
-  width: 118rpx; height: 118rpx; border-radius: 50%;
-  background: linear-gradient(145deg, #FFD9C6 0%, #FFA08F 55%, #FF8878 100%);
+/* 暖心卡右侧「小家」胶囊按钮：常驻、清晰、好点 */
+.warm-capsule {
+  flex: none;
+  display: flex; align-items: center; gap: 6rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #FF6F5E, #FF917A);
   color: #fff;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  box-shadow:
-    0 14rpx 30rpx rgba(255, 132, 115, 0.45),
-    inset 0 6rpx 10rpx rgba(255, 255, 255, 0.55),
-    inset 0 -7rpx 13rpx rgba(214, 88, 66, 0.22);
+  box-shadow: 0 8rpx 18rpx rgba(255, 111, 94, 0.32);
+  white-space: nowrap;
 }
-.my-fab-icon { font-size: 42rpx; line-height: 1; filter: drop-shadow(0 2rpx 3rpx rgba(160, 50, 34, 0.2)); }
-.my-fab-label {
-  font-size: 18rpx; font-weight: 600; line-height: 1.2; margin-top: 2rpx;
-  text-shadow: 0 1rpx 2rpx rgba(180, 60, 40, 0.18);
+.warm-capsule-icon { font-size: 26rpx; line-height: 1; }
+.warm-capsule-text { font-size: 24rpx; font-weight: 600; line-height: 1; }
+.warm-capsule-hover { transform: scale(0.96); opacity: 0.9; }
+
+/* 版本更新弹窗：左对齐列表 + 轻量卡片 */
+.release-mask {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  background: rgba(26, 20, 18, 0.46);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48rpx 44rpx;
+  box-sizing: border-box;
 }
-/* 右上角怦怦跳的小爱心 */
-.my-fab-heart {
-  position: absolute; top: 0rpx; right: 14rpx;
-  font-size: 27rpx; line-height: 1;
-  animation: heartBeat 1.5s ease-in-out infinite;
-  filter: drop-shadow(0 2rpx 3rpx rgba(240, 90, 60, 0.4));
+.release-dialog {
+  width: 100%;
+  max-width: 640rpx;
+  max-height: 72vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 44rpx 40rpx 32rpx;
+  box-sizing: border-box;
+  box-shadow: 0 24rpx 80rpx rgba(0, 0, 0, 0.2);
+  animation: releasePop 0.18s ease-out;
 }
-.my-fab-hover { transform: scale(0.94); opacity: 0.92; }
-@keyframes heartBeat {
-  0%, 100% { transform: scale(1); }
-  14% { transform: scale(1.3); }
-  28% { transform: scale(1); }
-  42% { transform: scale(1.18); }
+@keyframes releasePop {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
+.release-dialog-head {
+  display: flex; align-items: center; gap: 14rpx;
+  margin-bottom: 26rpx;
+}
+.release-dialog-title {
+  font-size: 34rpx; font-weight: 800; color: #2A2626;
+}
+.release-dialog-version {
+  flex: none;
+  font-size: 22rpx; font-weight: 600; color: #FF6F5E;
+  background: #FFF1EC;
+  padding: 4rpx 14rpx; border-radius: 999rpx;
+}
+.release-dialog-notes {
+  display: flex; flex-direction: column; gap: 18rpx;
+  text-align: left;
+}
+.release-note-row {
+  display: flex; align-items: flex-start; gap: 16rpx;
+}
+.release-note-dot {
+  flex: none;
+  width: 12rpx; height: 12rpx;
+  margin-top: 18rpx;
+  border-radius: 50%;
+  background: #FF9A86;
+}
+.release-note-text {
+  flex: 1; min-width: 0;
+  font-size: 28rpx; line-height: 1.65; color: #4A4543;
+  text-align: left;
+  word-break: break-word;
+}
+.release-dialog-tip {
+  margin-top: 26rpx;
+  font-size: 24rpx; line-height: 1.6; color: #8C8784;
+}
+.release-dialog-actions {
+  display: flex; align-items: center; gap: 20rpx;
+  margin-top: 34rpx;
+}
+.release-btn {
+  flex: 1;
+  height: 84rpx;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999rpx;
+  font-size: 30rpx; font-weight: 700;
+  box-sizing: border-box;
+}
+.release-btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #FF6F5E 0%, #FF8569 100%);
+  box-shadow: 0 8rpx 20rpx rgba(255, 111, 94, 0.32);
+}
+.release-btn.ghost {
+  color: #6E6865;
+  background: #F4F2F1;
+}
+.release-btn:active { opacity: 0.86; }

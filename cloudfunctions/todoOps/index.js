@@ -1,11 +1,10 @@
 // cloudfunctions/todoOps/index.js — 待办增删改（服务端写，绕过客户端安全规则）
-// action: 'add' | 'toggle' | 'important' | 'remove' | 'edit' | 'assign' | 'clearDone'
-// add:      { action:'add', familyId, content, openid, creatorNick, deadline, assignee }
+// action: 'add' | 'toggle' | 'important' | 'remove' | 'edit' | 'clearDone'
+// add:      { action:'add', familyId, content, openid, creatorNick, remindAt }
 // toggle:   { action:'toggle', id, done }（完成时服务端记录完成人 + 累加家庭里程碑
 // important: { action:'important', id, important }
 // remove:   { action:'remove', id }
-// edit:     { action:'edit', id, content, deadline, assignee }
-// assign:   { action:'assign', id, assignee }（更新待办指派成员 openid，空串=取消指派）
+// edit:     { action:'edit', id, content, remindAt }
 // clearDone: { action:'clearDone' }（清空本家庭全部已完成）
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -31,8 +30,8 @@ exports.main = async (event) => {
     if (event.action === 'add') {
       const familyId = String(event.familyId || '');
       const content = String(event.content || '').trim();
-      const deadline = event.deadline ? String(event.deadline) : null;
-      const assignee = event.assignee ? String(event.assignee) : '';
+      // 自定义提醒时刻（epoch 毫秒）；0/空 = 不提醒
+      const remindAt = event.remindAt ? Number(event.remindAt) : null;
       if (!familyId || !content) return { code: 1, message: '参数不完整' };
       // 取该家庭成员 openid，写入 todo.members，供 read 规则用 auth.openid in doc.members 判断
       let members = [];
@@ -52,10 +51,10 @@ exports.main = async (event) => {
           members,
           creatorOpenid: OPENID,
           creatorNick: String(event.creatorNick || '我'),
-          deadline,
-          assignee, // 指派成员 openid（空串=两人一起）
+          remindAt, // 自定义提醒时刻（epoch 毫秒，null=不提醒），sendReminders 到点发送
           createTime: db.serverDate(),
           doneTime: null,
+          reminded: false, // 是否已发提醒（sendReminders 触达后置 true，防重复）
         },
       });
       return { code: 0, message: 'ok', data: { id: res._id } };
@@ -77,18 +76,23 @@ exports.main = async (event) => {
         return { code: 1, message: e.message };
       }
       const wasDone = !!t.done;
+      // 里程碑只数「不同待办首次完成」：
+      // 用 countedDone 标记该待办是否已经计入过 totalDone，取消再勾不会重复累加。
+      const alreadyCounted = !!t.countedDone;
+      let countMilestone = false;
       if (done && !wasDone) {
         // 找完成人在家庭里的昵称
         try {
           const members = (family && family.members) || [];
           const nicks = (family && family.memberNicks) || {};
           doneNick = nicks[OPENID] || '';
-          if (members.includes(OPENID)) {
+          if (members.includes(OPENID) && !alreadyCounted) {
             // 累加家庭“一起完成”里程碑：用原子 _.inc 避免两人并发时的丢计数
             const familyId = t.familyId;
             await db.collection('families').doc(familyId).update({
               data: { totalDone: _.inc(1) },
             });
+            countMilestone = true;
             // 读回最新累计值，用于里程碑判断
             const after = await db.collection('families').doc(familyId).get();
             totalDone = (after.data && after.data.totalDone) || (family.totalDone || 0) + 1;
@@ -96,6 +100,8 @@ exports.main = async (event) => {
         } catch (e) { /* 里程碑/昵称尽力即可 */ }
       }
       const data = { done, doneTime: done ? db.serverDate() : null };
+      // 标记已计入，保证同一条待办只贡献一次里程碑
+      if (countMilestone) data.countedDone = true;
       if (doneNick) { data.doneBy = OPENID; data.doneNick = doneNick; }
       else if (done) { data.doneBy = OPENID; data.doneNick = '已完成'; }
       else { data.doneBy = ''; data.doneNick = ''; }
@@ -119,21 +125,20 @@ exports.main = async (event) => {
       if (!id || !content) return { code: 1, message: '编辑内容不能为空' };
       try { await assertMemberTodo(id, OPENID); } catch (e) { return { code: 1, message: e.message }; }
       const data = { content };
-      // deadline 显式更新（传空串即清除日期）
-      if (event.hasOwnProperty('deadline')) {
-        data.deadline = event.deadline ? String(event.deadline) : null;
+      // remindAt 显式更新（0/空 = 清掉提醒）；若提醒时刻变了，重置 reminded 重新武装
+      if (event.hasOwnProperty('remindAt')) {
+        const newRemindAt = event.remindAt ? Number(event.remindAt) : null;
+        let oldRemindAt = null;
+        try {
+          const cur = await db.collection('todos').doc(id).get();
+          oldRemindAt = (cur.data && cur.data.remindAt) || null;
+        } catch (e) { oldRemindAt = null; }
+        data.remindAt = newRemindAt;
+        if (Number(oldRemindAt || 0) !== Number(newRemindAt || 0)) {
+          data.reminded = false; // 提醒时刻变了才重新武装；只改内容则保留已提醒状态
+        }
       }
       await db.collection('todos').doc(id).update({ data });
-      return { code: 0, message: 'ok', data: {} };
-    }
-
-    if (event.action === 'assign') {
-      const id = String(event.id || '');
-      if (!id) return { code: 1, message: '参数不完整' };
-      try { await assertMemberTodo(id, OPENID); } catch (e) { return { code: 1, message: e.message }; }
-      await db.collection('todos').doc(id).update({
-        data: { assignee: event.assignee ? String(event.assignee) : '' },
-      });
       return { code: 0, message: 'ok', data: {} };
     }
 

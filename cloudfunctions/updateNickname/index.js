@@ -23,11 +23,13 @@ exports.main = async (event) => {
   }
   const family = res.data[0];
 
-  // 用点号路径动态更新该用户对应的昵称字段
+  // 读取现有昵称表，只更新自己那一项（点号路径在字段不存在时兼容性差，整表读写更稳）
+  const memberNicks = (family.memberNicks && typeof family.memberNicks === 'object' && !Array.isArray(family.memberNicks))
+    ? family.memberNicks
+    : {};
+  memberNicks[OPENID] = nick;
   await db.collection('families').doc(family._id).update({
-    data: {
-      ['memberNicks.' + OPENID]: nick,
-    },
+    data: { memberNicks },
   });
 
   return { code: 0, message: '昵称已更新', data: { nick } };

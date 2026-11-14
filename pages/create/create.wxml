@@ -30,13 +30,13 @@
   <view wx:else class="success">
     <view class="success-emoji">🎉</view>
     <view class="success-title">家庭已创建</view>
-    <view class="muted success-sub">把这个邀请码发给另一半</view>
+    <view class="muted success-sub">把这串码发给 TA</view>
     <view class="code-box" bindtap="copyCode">
       <text class="code">{{result.inviteCode}}</text>
       <text class="copy-hint">点击复制</text>
     </view>
-    <view class="muted tip">对方打开小程序 →「我有邀请码，加入」→ 输入这 6 位数即可</view>
-    <button class="btn-primary share-now" open-type="share">🎁 分享卡片来请 TA</button>
+    <view class="muted tip">TA 打开小程序，输入这 6 位码即可</view>
+    <button class="btn-primary share-now" open-type="share">🎁 分享给 TA</button>
     <button class="btn-ghost" bindtap="backHome">进入小本本</button>
   </view>
 </view>

@@ -1,0 +1,9 @@
+{
+  "name": "fixTodoMembers",
+  "version": "1.0.0",
+  "description": "一次性修复 todos.members（对齐家庭当前成员，供 watch 读规则使用）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

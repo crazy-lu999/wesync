@@ -4,7 +4,7 @@
 // 家庭相关走云函数（openid 由云端取，不可伪造）。
 
 const db = wx.cloud.database();
-const _ = db.command;
+const config = require('./config');
 const todos = db.collection('todos');
 
 // —— 云函数调用封装 ——
@@ -21,20 +21,15 @@ const createFamily = (myNick) => call('createFamily', { myNick });
 const joinFamily = (inviteCode, myNick) => call('joinFamily', { inviteCode, myNick });
 const getMyFamily = () => call('getMyFamily', {});
 const leaveFamily = () => call('leaveFamily', {});
+// 最新版本 + 更新说明（app_config 的 latest-version）
+const getLatestRelease = () => call('getLatestVersion', {});
 const updateNickname = (nick) => call('updateNickname', { nick });
-// 设置用户在家庭里的头像（微信头像经云存储上传后的 fileID）
-const updateAvatar = (fileID) => call('updateAvatar', { avatar: fileID });
-// 建议墙（公开）：提交一条公开建议（昵称与头像均存快照，避免随改名/改头像而变化）
-const submitFeedback = (content, nick, avatar) => call('submitFeedback', { content, nick, avatar });
-// 读取公开建议墙（开发者动态 + 全部建议，含状态/回复/isMine）
-const listWall = () => call('listFeedbacks', {});
-// 公开建议墙：点赞 / 取消点赞一条建议（返回最新 liked/count）
-const toggleWallLike = (id) => call('toggleWallLike', { id });
-// 建议墙管理（仅开发账户）：标记状态/回复/删除/发动态
-const wallSetStatus = (id, status) => call('manageWall', { action: 'setStatus', id, status });
-const wallReply = (id, reply) => call('manageWall', { action: 'reply', id, reply });
-const wallDelete = (id) => call('manageWall', { action: 'delete', id });
-const wallPostUpdate = (content) => call('manageWall', { action: 'postUpdate', content });
+// 意见反馈（私密）：提交一条反馈，仅开发者可查看，不提供任何公开列表/点赞/回复能力
+const submitFeedback = (content) => call('submitFeedback', { content });
+// 反馈管理（仅开发者本人）：服务端校验 openid，非开发者一律拒绝
+const adminListFeedback = () => call('adminFeedback', { action: 'list' });
+const adminMarkFeedbackRead = (id) => call('adminFeedback', { action: 'markRead', id });
+const adminDeleteFeedback = (id) => call('adminFeedback', { action: 'delete', id });
 // 家庭照片墙 / 相片墙标题 / 纪念日（服务端写）
 const addFamilyPhotos = (fileIDs) => call('updateFamily', { action: 'addPhotos', fileIDs });
 const removeFamilyPhoto = (fileID) => call('updateFamily', { action: 'removePhoto', fileID });
@@ -46,15 +41,15 @@ const removeAnniversary = (id) => call('updateFamily', { action: 'removeAnnivers
 
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
-async function addTodo(familyId, content, openid, creatorNick, deadline, assignee) {
-  await call('todoOps', {
+// 返回 { id }：前端拿到 id 后可以本地直接把新条目插进列表，不必再拉一次全量
+async function addTodo(familyId, content, openid, creatorNick, remindAt) {
+  return call('todoOps', {
     action: 'add',
     familyId,
     content,
     openid,
     creatorNick: creatorNick || '我',
-    deadline: deadline || '',
-    assignee: assignee || '',
+    remindAt: remindAt || '',
   });
 }
 
@@ -77,15 +72,40 @@ async function removeTodo(id) {
   await call('todoOps', { action: 'remove', id });
 }
 
-async function editTodo(id, content, deadline) {
-  await call('todoOps', { action: 'edit', id, content, deadline: deadline || '' });
+async function editTodo(id, content, remindAt) {
+  await call('todoOps', { action: 'edit', id, content, remindAt: remindAt || '' });
 }
-
-// 指派/取消指派待办给某成员（openid，空串=两人一起）
-const assignTodo = (id, assignee) => call('todoOps', { action: 'assign', id, assignee: assignee || '' });
 
 // 服务端读当前家庭待办（绕过脆弱的客户端 read 规则，稳定可靠）
 const getMyTodos = () => call('getMyTodos', {});
+
+// 待办提醒：请求「订阅消息」授权（一次性，点一次授一条）。
+// ⚠️ 必须在用户点击事件的**同步链路**里调用：一旦先 await 云函数（添加/保存），
+// 手势上下文丢失，微信会直接 fail（表现为“总是未开启提醒”）。
+// 未填模板 ID 时直接返回 false，不弹窗、不报错。
+function requestTodoReminder() {
+  const tmplId = config.REMIND_TMPL_ID || '';
+  if (!tmplId || tmplId.indexOf('请填写') === 0) {
+    console.warn('[remind] 未配置 REMIND_TMPL_ID，跳过订阅授权');
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    wx.requestSubscribeMessage({
+      tmplIds: [tmplId],
+      success: (res) => {
+        // accept=同意接收，reject=拒绝，ban=已拒绝过，filter=模板被过滤
+        const state = res[tmplId];
+        resolve(state === 'accept');
+      },
+      fail: (err) => {
+        // 常见：20004 用户设置关闭、20001 模板不存在/未审核、
+        // 或“can only be invoked by user TAP gesture”（调用时机不对）
+        console.error('[remind] requestSubscribeMessage fail', err);
+        resolve(false);
+      },
+    });
+  });
+}
 
 // 实时订阅本家庭 todos（客户端 watch）。返回关闭函数。
 // 注意：实时推送不支持 orderBy，排序由前端 renderTodos 完成。
@@ -102,7 +122,10 @@ function subscribeTodos(familyId, onChange, onError) {
         }
       },
       onError(err) {
-        console.error('[watch] todos error', err);
+        // 光打印 err 在开发者工具里只会看到个 minified 的 "T"，真正能定位的是 errCode/errMsg：
+        //   -501007 / PERMISSION_DENIED 之类 = 读规则拦了（含「有一条文档读不了」的情况）
+        //   实时数据推送未开通 = 集合能力没开
+        console.error('[watch] todos error', err && err.errCode, (err && err.errMsg) || err);
         onError && onError(err);
       },
     });
@@ -110,21 +133,16 @@ function subscribeTodos(familyId, onChange, onError) {
 }
 
 module.exports = {
-  _,
-  db,
   createFamily,
   joinFamily,
   getMyFamily,
   leaveFamily,
+  getLatestRelease,
   updateNickname,
-  updateAvatar,
   submitFeedback,
-  listWall,
-  toggleWallLike,
-  wallSetStatus,
-  wallReply,
-  wallDelete,
-  wallPostUpdate,
+  adminListFeedback,
+  adminMarkFeedbackRead,
+  adminDeleteFeedback,
   addFamilyPhotos,
   removeFamilyPhoto,
   setWallTitle,
@@ -134,10 +152,10 @@ module.exports = {
   addTodo,
   toggleTodo,
   setImportant,
-  assignTodo,
   clearDoneTodos,
   editTodo,
   removeTodo,
   getMyTodos,
   subscribeTodos,
+  requestTodoReminder,
 };

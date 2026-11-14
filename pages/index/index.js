@@ -1,7 +1,8 @@
 // pages/index/index.js
-const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, assignTodo, clearDoneTodos, subscribeTodos } = require('../../utils/db.js');
+const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, clearDoneTodos, subscribeTodos, requestTodoReminder } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
 const { buildShare } = require('../../utils/share.js');
+const { getLocalRelease } = require('../../utils/release-notes.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -28,6 +29,18 @@ function isNewerVersion(server, local) {
 // 只在较短时间内连续 onShow 时防抖，避免打爆云函数；
 // 但保证每次真正意义上的热启动(间隔超过该值)都会重新判定，能感知挂后台期间的新发版。
 const UPDATE_CHECK_GAP = 30 * 1000;
+
+// —— 同步兜底参数 ——
+// watch 不可用时的轮询节奏。以前是写死的 3 秒一次 getMyTodos 云函数：既卡（每次都 setData
+// 全量列表）又费额度，网络差时请求还会叠在一起。
+const POLL_INTERVAL = 10 * 1000;
+const POLL_MAX_INTERVAL = 60 * 1000;
+// watch 失败后隔多久再试一次实时推送（次数用完就一直轮询，不再刷日志）。
+// 这是「有限重试时刻表」，不是无限重连：权限问题重连多少次都没用。
+const WATCH_RETRY_DELAYS = [30 * 1000, 2 * 60 * 1000, 10 * 60 * 1000];
+// 本地刚勾选/取消后，本地状态在快照里被确认前的最长保护时间（毫秒）。
+// 云函数往返通常 <1s，留 5s 足够；超时则回归服务端值，不至于永远说谎。
+const OPTIMISTIC_TTL = 5000;
 
 // 今天（本地日期，YYYY-MM-DD），用于日期选择的 start 下限，禁止选过去的日子
 const todayStr = (() => {
@@ -102,30 +115,12 @@ function countWeeklyDone(todos) {
   return n;
 }
 
-// 一次性截止日期 → 剩余天数可视化信息。返回 null 表示未标记日期。
-function calcDeadline(deadline) {
-  if (!deadline) return null;
-  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(deadline);
-  if (!m) return null;
-  const y = +m[1], mo = +m[2], d = +m[3];
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(y, mo - 1, d);
-  const days = Math.round((target - today) / 86400000);
-  const label = `${mo}月${d}日`;
-  let text, state;
-  if (days < 0) { state = 'past'; text = `已过 ${-days} 天`; }
-  else if (days === 0) { state = 'today'; text = '就是今天 🎉'; }
-  else if (days === 1) { state = 'soon'; text = '明天就到啦'; }
-  else if (days <= 7) { state = 'soon'; text = `还有 ${days} 天 · 快到了`; }
-  else { state = 'normal'; text = `还有 ${days} 天`; }
-  return { days, label, text, state };
-}
-
-// 摘要成一行文案（用于输入栏 chip：如「8月5日 · 还有 3 天」）
-function deadlineChipText(deadline) {
-  const info = calcDeadline(deadline);
-  return info ? `${info.label} · ${info.text}` : (deadline || '');
+// 把提醒时刻（epoch 毫秒）格式化成「M月D日 HH:MM」；空返回空串
+function fmtRemind(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 Page({
@@ -138,8 +133,6 @@ Page({
     myNick: '我',
     todos: [],
     inputVal: '',
-    pollTimer: null,
-    watchClose: null,
     subscribing: false,
     syncMode: 'poll', // 'realtime' 实时推送 | 'poll' 轮询兜底
     todosReady: false, // 首次从服务端拉到待办后才置 true（用于区分真假空态）
@@ -149,19 +142,30 @@ Page({
     weeklyDone: 0, // 这周一起完成的件数（周小结）
     dailyPhrase: '', // 今天的一句窝心话
     annivInfo: { nextLabel: '' }, // 最近一场纪念日倒计时
-    assignFor: '', // 新建待办指派给谁（openid，空=两人一起）
-    assignForText: '👥 一起', // 底部指派 chip 文案
     syncTip: '', // 语义化同步提示（TA 刚完成了…）
     showUpdateBanner: false, // 有新版本时显示顶部横幅
     templates: config.TODO_TEMPLATES,
-    inputDeadline: '', // 新建/编辑时标记的一次性截止日期 YYYY-MM-DD
-    inputDeadlineText: '', // 同上的倒计时文案（如 8月5日 · 还有 3 天）
+    inputRemindDate: '', // 新建/编辑时选的提醒日期 YYYY-MM-DD
+    inputRemindTime: '', // 提醒时间 HH:MM（提醒日期 + 该时刻 = 到点推送）
     today: todayStr,    // 日期选择的下限（今天），禁止选过去的日子
     undoLabel: '', // 删除/清空的撤销提示条文案
+    kbHeight: 0, // 键盘高度（px）：编辑面板/输入栏往上顶，保证「保存」按钮不被键盘遮住
+    // 提醒授权引导
+    showRemindGuide: false, // 首页顶部引导条：开启微信提醒
+    remindNeedAuth: true, // 是否还没授权过提醒（用于输入区提示）
     // 编辑态
     editing: false,
     editingId: '',
     inputFocus: false,
+    // 版本更新弹窗（自定义，保证更新点左对齐）
+    releaseModal: {
+      visible: false,
+      mode: 'notes',
+      title: '',
+      version: '',
+      notes: [],
+      tip: '',
+    },
     // 撒花庆祝
     celebrate: false,
     petals: [],
@@ -170,16 +174,19 @@ Page({
   onShow() {
     // 每次回到首页都检查一次（冷启动 & 热启动都能感知新版），发现新版本即显示顶部横幅
     this.checkLatestVersion();
+    // 刷新提醒授权引导（用户可能刚在「我的」页授权过）
+    this.refreshRemindGuide();
     // 从 create/join 返回时刷新家庭
     if (app.globalData.family !== this.data.family) {
       this.loadFamily();
     }
-    // 有家庭则开启同步
+    // 有家庭则开启同步（syncStart 内部幂等，重复调用不会重复订阅）
     if (this.data.hasFamily) this.syncStart();
   },
 
   onHide() {
     this.syncStop();
+    if (this.data.kbHeight) this.setData({ kbHeight: 0 });
   },
 
   onUnload() {
@@ -218,6 +225,8 @@ Page({
     }
     // 即时同步 getUpdateManager 的判定结果（冷/热启动都反映）
     this.setData({ showUpdateBanner: !!app.globalData.hasUpdate });
+    // 更新后的「本次更新」说明：每个版本只弹一次
+    this.maybeShowReleaseNotes();
   },
 
   // 云函数兜底校验：只把「远端比本地新」视为有新版；
@@ -226,19 +235,96 @@ Page({
     wx.cloud
       .callFunction({ name: 'getLatestVersion' })
       .then((r) => {
-        const latest = (r && r.result && r.result.data && r.result.data.version) || '';
+        const d = (r && r.result && r.result.data) || {};
+        const latest = d.version || '';
+        // 缓存云端更新说明，供「旧版横幅」点开时预览
+        if (latest) {
+          const release = {
+            version: latest,
+            title: d.title || '',
+            notes: Array.isArray(d.notes) ? d.notes : [],
+            releasedAt: d.releasedAt || '',
+          };
+          this._remoteRelease = release;
+          app.globalData.latestRelease = release;
+        }
         const newer = isNewerVersion(latest, config.APP_VERSION);
         // 任一来源判定有新版即视为有新版；都不满足则收起横幅
         app.globalData.hasUpdate = !!app.globalData.hasUpdate || newer;
         this.setData({ showUpdateBanner: !!app.globalData.hasUpdate });
+        // 若本地兜底没有说明，这里还能用云端 notes 补一次
+        this.maybeShowReleaseNotes();
       })
       .catch((e) => console.warn('[update] 版本兜底检查失败', e));
+  },
+
+  // 新版本启动后弹一次「本次更新」说明：
+  // 首次安装只记录版本不打扰；同一版本只弹一次；没有配置说明就安静跳过。
+  maybeShowReleaseNotes() {
+    const current = config.APP_VERSION;
+    const last = wx.getStorageSync('lastVersion');
+    if (!last) {
+      // 首次安装：只记录版本，不打扰；老用户升级上来则继续走更新说明
+      const existingUser = !!wx.getStorageSync('myOpenid');
+      if (!existingUser) {
+        wx.setStorageSync('lastVersion', current);
+        return;
+      }
+    } else if (last === current) {
+      return;
+    }
+    // 优先用云端同版本说明；没有则用本地兜底
+    const remote = this._remoteRelease || app.globalData.latestRelease || null;
+    const release = (remote && remote.version === current && remote.notes && remote.notes.length)
+      ? remote
+      : getLocalRelease(current);
+    // 没有说明时先不记版本，等云端说明补齐后下次还能弹
+    if (!release || !release.notes || !release.notes.length) return;
+    // 写入版本，避免同一个版本重复弹
+    wx.setStorageSync('lastVersion', current);
+    this.openReleaseModal('notes', release);
+  },
+
+  // 打开自定义版本更新弹窗（mode: notes=已更新说明，update=旧版横幅引导更新）
+  openReleaseModal(mode, release) {
+    const notes = ((release && release.notes) || [])
+      .filter((x) => typeof x === 'string' && x.trim())
+      .slice(0, 8);
+    if (!notes.length) return false;
+    this.setData({
+      releaseModal: {
+        visible: true,
+        mode,
+        title: (release && release.title) || (mode === 'update' ? '有新版本啦' : '这次更新'),
+        version: (release && release.version) || '',
+        notes,
+        tip: mode === 'update' ? '重启后生效，要现在更新吗？' : '',
+      },
+    });
+    return true;
+  },
+
+  onCloseReleaseModal() {
+    this.setData({ 'releaseModal.visible': false });
+  },
+
+  onConfirmUpdate() {
+    this.setData({ 'releaseModal.visible': false });
+    this.doUpdateNow();
   },
 
   // 点横幅：二级菜单引导更新。
   // 微信没有“当场重启”，更新只在「下次冷启动」生效；
   // 所以点横幅先给用户选择，选了更新后再按“新版是否已下载完成”拆分两种反馈。
   onRestart2Update() {
+    const release = this._remoteRelease || app.globalData.latestRelease || null;
+    const hasNotes = !!(release && release.notes && release.notes.length
+      && isNewerVersion(release.version, config.APP_VERSION));
+    if (hasNotes) {
+      this.openReleaseModal('update', release);
+      return;
+    }
+    // 没拿到新版说明时，保持原来的简单确认
     wx.showActionSheet({
       itemList: ['🎁 去更新（退出后生效）', '稍后再说'],
       success: (res) => {
@@ -370,64 +456,118 @@ Page({
       .finally(() => wx.hideLoading());
   },
 
-  // 同步策略：实时推送为主，失败自动降级轮询（永不中断）
-  syncStart() {
+  // 同步策略：实时推送为主，失败自动降级轮询（永不中断），并有限次尝试重回实时。
+  // force=true 时忽略「同一家庭已在同步」的幂等判断（供失败重试用）。
+  syncStart(force) {
     const familyId = this.data.family && this.data.family._id;
     if (!familyId) return;
+    // 幂等：同一家庭已经在同步就直接返回。以前 onShow 与 loadFromCloud 各调一次，
+    // 冷启动会订阅两遍（一遍必然失败的 watch + 一次多余的 close），日志刷屏还多耗一轮云函数。
+    if (!force && this._syncFamilyId === familyId) return;
     this.syncStop();
+    this._syncFamilyId = familyId;
     this.setData({ subscribing: true, syncMode: 'realtime' });
     this.fetchTodos(); // 立即拉一次，保证首屏
-    this.watchClose = subscribeTodos(
+    this._watchClose = subscribeTodos(
       familyId,
       (todos) => {
+        // 能收到推送说明实时通道是通的：清失败计数、停轮询、回实时模式
+        this._watchFails = 0;
+        this.stopPoll();
         const list = todos || [];
         this.announceChanges(list);
         this.renderTodos(list);
-        this.setData({ syncMode: 'realtime' });
+        if (this.data.syncMode !== 'realtime') this.setData({ syncMode: 'realtime' });
       },
-      (err) => {
-        // watch 不可用（未开通实时推送/未配读规则）→ 降级为轮询
-        console.warn('[sync] watch 不可用，降级为轮询', err);
-        this.setData({ syncMode: 'poll' });
-        this.startPoll();
-      }
+      (err) => this.onWatchUnavailable(err)
     );
   },
 
-  syncStop() {
-    if (this.watchClose) {
-      try { this.watchClose(); } catch (e) { /* ignore */ }
-      this.watchClose = null;
-    }
-    this.stopPoll();
-    this.setData({ subscribing: false });
+  // watch 建立失败（实时推送未开通 / 读规则拦了某些文档 / 断网）→ 降级轮询 + 稍后重试
+  onWatchUnavailable(err) {
+    // 页面已停止同步（切后台 / 退出家庭）后，watch 的迟到错误不应把轮询又拉起来
+    if (!this._syncFamilyId) return;
+    console.warn('[sync] watch 不可用，降级为轮询', (err && err.errCode) || '', (err && err.errMsg) || '');
+    this.setData({ syncMode: 'poll' });
+    this.startPoll();
+    this.scheduleWatchRetry();
   },
 
+  // 有限次重试：轮询照常跑着，到点再试一次实时推送
+  scheduleWatchRetry() {
+    this.clearWatchRetry();
+    const fails = this._watchFails || 0;
+    const delay = WATCH_RETRY_DELAYS[fails];
+    if (!delay) return; // 次数用完：稳定用轮询，别再刷日志
+    this._watchFails = fails + 1;
+    this._watchRetryTimer = setTimeout(() => {
+      this._watchRetryTimer = null;
+      if (this.data.syncMode === 'poll') this.syncStart(true);
+    }, delay);
+  },
+
+  clearWatchRetry() {
+    if (this._watchRetryTimer) {
+      clearTimeout(this._watchRetryTimer);
+      this._watchRetryTimer = null;
+    }
+  },
+
+  syncStop() {
+    this._syncFamilyId = null;
+    this.clearWatchRetry();
+    if (this._watchClose) {
+      const close = this._watchClose;
+      this._watchClose = null;
+      // 连接已断时 close() 会抛 "websocket not connected"，属预期情况，忽略
+      try { close(); } catch (e) { /* ignore */ }
+    }
+    this.stopPoll();
+    if (this.data.subscribing) this.setData({ subscribing: false });
+  },
+
+  // 轮询兜底：setTimeout 链（上一次拉完再排下一次），网络慢也不会堆积请求
   startPoll() {
     this.stopPoll();
-    this.data.pollTimer = setInterval(() => this.fetchTodos(), 3000);
+    this._pollDelay = POLL_INTERVAL;
+    this._armPoll(POLL_INTERVAL);
+  },
+
+  _armPoll(delay) {
+    this._pollTimer = setTimeout(async () => {
+      this._pollTimer = null;
+      const ok = await this.fetchTodos();
+      if (this.data.syncMode !== 'poll') return; // 已重回实时，停止轮询
+      const next = ok ? POLL_INTERVAL : Math.min((this._pollDelay || POLL_INTERVAL) * 2, POLL_MAX_INTERVAL);
+      this._pollDelay = next;
+      this._armPoll(next);
+    }, delay);
   },
 
   stopPoll() {
-    if (this.data.pollTimer) {
-      clearInterval(this.data.pollTimer);
-      this.data.pollTimer = null;
+    if (this._pollTimer) {
+      clearTimeout(this._pollTimer);
+      this._pollTimer = null;
     }
   },
 
+  // 返回 true=成功（轮询据此决定是否退避）；并发调用直接跳过，避免写入后刷新与轮询叠一起
   async fetchTodos() {
+    if (this._fetching) return true;
+    this._fetching = true;
     try {
       const data = await getMyTodos();
       const list = data.todos || [];
       if (this._inited) this.announceChanges(list);
-      this.renderTodos(list);
+      this.renderTodos(list); // 内部会把快照写进缓存，下次进入秒显
       this._inited = true;
       this.setData({ todosReady: true });
-      // 缓存本次服务端快照，下次进入秒显
-      const familyId = this.data.family && this.data.family._id;
-      if (familyId) wx.setStorageSync('todos_' + familyId, data.todos || []);
+      return true;
     } catch (e) {
       this.setData({ subscribing: false });
+      return false;
+    } finally {
+      this._fetching = false;
     }
   },
 
@@ -464,34 +604,121 @@ Page({
   },
 
   renderTodos(todos) {
-    // 撤销窗口期内（删除/清空的 5s 里真是删除还没落库）：把待撤销条目的 id 从
-    // 服务端快照里再次剔除，避免 watch/轮询恰好在窗口内推来一版仍含这些条目的
-    // 快照，把它们重绘回来 → 用户看到的"先消失又回来、5s 后又消失"就是这个。《以下过滤》
-    if (this._undo && this._undo.pending && this._undo.pending.length) {
-      const pending = {};
-      this._undo.pending.forEach((p) => { if (p.todo && p.todo._id) pending[p.todo._id] = true; });
-      todos = todos.filter((t) => !pending[t._id]);
-    }
-    const nicks = (this.data.family && this.data.family.memberNicks) || {};
+    // ① 已本地移除、等服务端确认删除的条目一律不渲染 —— 撤销窗口 5s 内、以及窗口结束后
+    //    的“真实删除”期间（云函数还没返回）都要生效。否则 watch/轮询推来的一版旧快照
+    //    会把已删除的条目又画回来一次，然后才消失，看起来非常诡异。
+    todos = this._filterHidden(todos);
     const my = this.data.myOpenid;
     const mapped = todos.map((t) => ({
       ...t,
       timeText: fmtTime(t.createTime),
       doneTimeText: fmtTime(t.doneTime),
       mine: t.creatorOpenid === my,
-      dayInfo: calcDeadline(t.deadline),
-      // 指派徽标：assignedToMe → 我用我的配色；否则显示对方昵称
-      assignNick: t.assignee ? (nicks[t.assignee] || 'TA') : '',
-      assignToMe: !!t.assignee && t.assignee === my,
+      remindText: fmtRemind(t.remindAt), // 卡片提醒徽标文案
     }));
-    // 未完成在前（重要>临近7天>普通），已完成沉底；同类按创建时间倒序
+    // ② 刚勾选/取消的条目：短窗口内以本地状态为准，避免“完成后跳回未完成、再跳回去”的闪动
+    this._applyOptimistic(mapped);
+    // 未完成在前（重要在前），已完成沉底；同优先级按创建时间倒序
     mapped.sort((a, b) => this.cmpTodos(a, b));
     const doneCount = mapped.filter((t) => t.done).length;
     const weeklyDone = countWeeklyDone(mapped); // 周小结
     this.setData({ todos: mapped, doneCount, activeCount: mapped.length - doneCount, weeklyDone });
+    // 快照落缓存：下次冷启动首屏秒显（本地增删改后也保持一致）
+    this._cacheTodos(mapped);
     // 记录本次快照，供 announceChanges 做同源对比
     this._prevTodos = {};
     mapped.forEach((t) => { this._prevTodos[t._id] = { done: !!t.done, content: t.content, important: !!t.important }; });
+  },
+
+  _cacheTodos(list) {
+    const familyId = this.data.family && this.data.family._id;
+    if (!familyId) return;
+    try { wx.setStorageSync('todos_' + familyId, list || []); } catch (e) { /* 存储异常忽略 */ }
+  },
+
+  // —— 本地即时改动的两把「保护伞」 ——
+  // ① _hidden：已从列表移除、等服务端确认删除的 id
+  // ② _optimistic：刚勾选/取消的 id → 本地补丁（快照跟上后就解除）
+
+  _hideTodoIds(ids) {
+    if (!this._hidden) this._hidden = {};
+    const now = Date.now();
+    (ids || []).forEach((id) => { if (id) this._hidden[id] = now; });
+  },
+
+  _unhideTodoIds(ids) {
+    if (!this._hidden) return;
+    (ids || []).forEach((id) => { delete this._hidden[id]; });
+  },
+
+  // 30s 兜底：万一删除请求一直失败，条目也不会永远消失（超时后放行，由服务端说了算）
+  _filterHidden(todos) {
+    const hidden = this._hidden;
+    if (!hidden) return todos;
+    const now = Date.now();
+    return todos.filter((t) => {
+      const at = hidden[t._id];
+      if (!at) return true;
+      if (now - at > 30 * 1000) { delete hidden[t._id]; return true; }
+      return false;
+    });
+  },
+
+  _markOptimistic(id, patch) {
+    if (!this._optimistic) this._optimistic = {};
+    this._optimistic[id] = { patch, at: Date.now() };
+  },
+
+  // 快照还没跟上时，用本地乐观值兜住；快照一旦与本地一致，立即解除保护
+  _applyOptimistic(mapped) {
+    const opt = this._optimistic;
+    if (!opt) return;
+    const now = Date.now();
+    Object.keys(opt).forEach((id) => {
+      const o = opt[id];
+      const t = mapped.find((x) => x._id === id);
+      if (!t || now - o.at > OPTIMISTIC_TTL) { delete opt[id]; return; }
+      if (t.done === o.patch.done) { delete opt[id]; return; } // 服务端已跟上
+      Object.assign(t, o.patch);
+    });
+  },
+
+  // 自己新增成功后就地插入（用服务端返回的 id），不再拉一次全量
+  insertLocalTodo({ _id, content, remindAt }) {
+    if (!_id) { this.fetchTodos(); return; } // 没拿到 id 才退回全量刷新
+    const family = this.data.family || {};
+    const todo = {
+      _id,
+      familyId: family._id,
+      content,
+      done: false,
+      members: family.members || [],
+      creatorOpenid: this.data.myOpenid,
+      creatorNick: this.data.myNick || '我',
+      remindAt: remindAt || null,
+      createTime: new Date(),
+      doneTime: null,
+      reminded: false,
+      mine: true,
+    };
+    this.suppressChange(_id); // 自己新增的，不播报成「TA 添加了」
+    this.renderTodos(this.data.todos.concat([todo]));
+    this.setData({ todosReady: true });
+  },
+
+  // 就地补字段：不重排、不整表重拉，避免「点一下等半秒」
+  patchLocalTodo(id, patch) {
+    const todos = this.data.todos.slice();
+    const t = todos.find((x) => x._id === id);
+    if (!t) { this.fetchTodos(); return; }
+    Object.assign(t, patch);
+    const doneCount = todos.filter((x) => x.done).length;
+    this.setData({
+      todos,
+      doneCount,
+      activeCount: todos.length - doneCount,
+      weeklyDone: countWeeklyDone(todos),
+    });
   },
 
   // 顶部的短暂同步事件提示条
@@ -505,13 +732,45 @@ Page({
     this.setData({ inputVal: e.detail.value });
   },
 
-  // 选/清截止日期
-  onPickDeadline(e) {
+  // 选/清提醒日期
+  onPickRemindDate(e) {
     const v = e.detail.value || '';
-    this.setData({ inputDeadline: v, inputDeadlineText: deadlineChipText(v) });
+    this.setData({ inputRemindDate: v });
   },
-  onClearDeadline() {
-    this.setData({ inputDeadline: '', inputDeadlineText: '' });
+  onClearRemindDate() {
+    this.setData({ inputRemindDate: '', inputRemindTime: '' });
+  },
+
+  // 选/清提醒时间
+  onPickRemindTime(e) {
+    const v = e.detail.value || ''; // 'HH:MM'
+    this.setData({ inputRemindTime: v });
+  },
+  onClearRemind() {
+    this.setData({ inputRemindTime: '' });
+  },
+  // 由「提醒日期 + 提醒时间」算出 remindAt（epoch 毫秒）；缺任一返回 0（不提醒）
+  // 注意：不能用 new Date(`YYYY-MM-DD HH:MM`) 字符串解析，iOS(JavaScriptCore) 会得 Invalid Date，
+  // 必须按年月日时分分量构造，保证双端一致。
+  composeRemindAt(date, time) {
+    if (!date || !time) return 0;
+    const md = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(date);
+    const mt = /^(\d{1,2}):(\d{2})$/.exec(time);
+    if (!md || !mt) return 0;
+    const ts = new Date(+md[1], +md[2] - 1, +md[3], +mt[1], +mt[2]).getTime();
+    return Number.isFinite(ts) ? ts : 0;
+  },
+
+  // 静默续订阅额度（方案 A）——注意：requestSubscribeMessage 必须在用户点击的同步链路里发起，
+  // 所以这里只能放在点击处理函数的开头，且不做任何 await 前的准备工作。
+  // 仅在用户已选「总是保持以上选择」时才调，否则会弹窗骚扰用户。每天最多一次。
+  maybeRenewRemindQuota() {
+    if (!app.globalData.remindTmplAccept) return;
+    const KEY = 'remindRenewAt';
+    const last = Number(wx.getStorageSync(KEY) || 0);
+    if (Date.now() - last < 20 * 3600 * 1000) return;
+    wx.setStorageSync(KEY, Date.now());
+    requestTodoReminder(); // 已选「总是」→ 不弹窗，静默 +1 条
   },
 
   async onAdd() {
@@ -521,22 +780,32 @@ Page({
       await this.saveEdit(content);
       return;
     }
-    const deadline = this.data.inputDeadline; // 先取日期，再清空状态
-    const assignee = this.data.assignFor;      // 指派成员（openid）
+    const remindDate = this.data.inputRemindDate; // 先取日期，再清空状态
+    const remindAt = this.composeRemindAt(remindDate, this.data.inputRemindTime);
+    // 没选提醒时才静默续额度；选了提醒下面会主动弹授权，两者不能同时发
+    if (!remindAt) this.maybeRenewRemindQuota();
+    // 设了提醒但时刻已过（如今天已过去的钟点）：拦截，避免建出无效提醒
+    if (remindAt && remindAt <= Date.now()) {
+      wx.showToast({ title: '提醒时刻已过，请选未来的时间', icon: 'none' });
+      return;
+    }
+    // 订阅消息授权：必须在本点击回调里先发起（不能等 addTodo 回来再弹），
+    // 否则手势上下文丢失，微信直接 fail → 总是“未开启提醒”。
+    const authOk = remindAt ? await requestTodoReminder() : null;
     // 备份草稿：云端失败时原样还回输入框，避免打一半的字被吞
     const draft = {
       inputVal: this.data.inputVal,
-      inputDeadline: this.data.inputDeadline,
-      inputDeadlineText: this.data.inputDeadlineText,
-      assignFor: this.data.assignFor,
-      assignForText: this.data.assignForText,
+      inputRemindDate: this.data.inputRemindDate,
+      inputRemindTime: this.data.inputRemindTime,
     };
-    this.setData({ inputVal: '', inputDeadline: '', inputDeadlineText: '', assignFor: '', assignForText: '👥 一起' });
+    this.setData({ inputVal: '', inputRemindDate: '', inputRemindTime: '' });
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, deadline, assignee);
-      this.fetchTodos(); // 立刻刷新，自己的新任务零延迟出现
+      const r = (await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, remindAt)) || {};
+      // 用服务端返回的 id 本地插入，省掉「写完再拉一次全量」的往返
+      this.insertLocalTodo({ _id: r.id, content, remindAt });
       wx.hideLoading();
+      if (remindAt) this.toastRemindAuth(authOk);
     } catch (e) {
       wx.hideLoading();
       this.setData(draft); // 失败：把草稿还给输入框，用户可重试而非重打
@@ -544,34 +813,17 @@ Page({
     }
   },
 
-  // 底部「指派给谁」chip：在成员里选一个指定执行人
-  onPickAssign() {
-    const mems = (this.data.family && this.data.family.memberNicks) || {};
-    const me = this.data.myOpenid;
-    const opts = [{ label: '👥 一起做（不指派）', val: '' }];
-    opts.push({ label: `给我（${this.data.myNick}）`, val: me });
-    Object.keys(mems).forEach((o) => {
-      if (o !== me) opts.push({ label: `给 ${mems[o]}`, val: o });
-    });
-    wx.showActionSheet({
-      itemList: opts.map((o) => o.label),
-      success: (res) => {
-        if (res.tapIndex < 0) return;
-        const c = opts[res.tapIndex];
-        this.setData({ assignFor: c.val, assignForText: c.label });
-      },
-      fail: () => { /* 取消 */ },
-    });
-  },
+
 
   // 空态一键填入示例模板
   async useTemplate(e) {
+    this.maybeRenewRemindQuota();
     const content = (e.currentTarget.dataset.content || '').trim();
     if (!content) return;
     wx.showLoading({ title: '添加中' });
     try {
-      await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick, '', this.data.assignFor);
-      this.fetchTodos();
+      const r = (await addTodo(this.data.family._id, content, this.data.myOpenid, this.data.myNick)) || {};
+      this.insertLocalTodo({ _id: r.id, content });
       wx.hideLoading();
     } catch (err) {
       wx.hideLoading();
@@ -581,13 +833,26 @@ Page({
 
   // 点击圆形勾选：切换完成状态（完成=标记，保留在列表并计入"已完成"，不删除）+ 撒花庆祝
   async onToggle(e) {
+    this.maybeRenewRemindQuota();
     const { index } = e.currentTarget.dataset;
     const todo = this.data.todos[index];
     if (!todo) return;
     const becomingDone = !todo.done;
-    const prev = this.data.todos.slice();
+    // 深拷贝一层条目：setLocallyDone 是原位改 done 的，直接 slice() 会共享同一批对象，
+    // 导致失败时的“回滚”其实回滚不了（旧代码就有这个隱患）
+    const prev = this.data.todos.map((t) => ({ ...t }));
+    const doneTime = becomingDone ? new Date() : null;
+    const donePatch = {
+      done: becomingDone,
+      doneTime,
+      doneTimeText: fmtTime(doneTime),
+      doneBy: becomingDone ? this.data.myOpenid : null,
+      doneNick: becomingDone ? (this.data.myNick || '我') : '',
+    };
     // 乐观更新：先"原位"标记完成，让勾选/划线动画在这张卡原位播一下
     this.setLocallyDone(todo._id, becomingDone);
+    // 登记本地状态：这期间 watch/轮询推来的、还没落库的旧快照不会把勾选改回去
+    this._markOptimistic(todo._id, donePatch);
     // 立刻本地重排（完成→沉到底部 / 恢复→回到待办区）。用本地短定时器触发，
     // 完全不等云端往返——以前是 await toggleTodo 云函数成功后才做，叠加出的 1~2s 卡顿就来自这里。
     if (this._sinkTimer) clearTimeout(this._sinkTimer);
@@ -603,7 +868,9 @@ Page({
     try {
       const r = (await toggleTodo(todo._id, becomingDone)) || {};
       this.suppressChange(todo._id);
-      this.fetchTodos(); // 对齐服务端（早已按状态排好序，无额外视觉跳动）
+      // 状态已经乐观更新过，这里只补服务端才有的字段（完成时间/完成人），
+      // 不再整表重拉：以前每次勾选都多一次 getMyTodos 往返，那一下就是卡顿感来源
+      this.patchLocalTodo(todo._id, donePatch);
       // 里程碑：一起完成累计件数到 10/50/100… 时弹一次庆祝
       if (becomingDone) {
         const total = r.totalDone || 0;
@@ -615,6 +882,7 @@ Page({
     } catch (err) {
       // 云端失败：取消待执行的重排，整体回滚到点之前的状态
       if (this._sinkTimer) { clearTimeout(this._sinkTimer); this._sinkTimer = null; }
+      if (this._optimistic) delete this._optimistic[todo._id]; // 失败时把乐观保护一并撑销
       this.setData({ todos: prev, doneCount: prev.filter((t) => t.done).length, activeCount: prev.filter((t) => !t.done).length });
       wx.showToast({ title: becomingDone ? '完成失败，请重试' : '恢复失败，请重试', icon: 'none' });
     }
@@ -647,12 +915,10 @@ Page({
     return tb - ta;
   },
 
-  // 未完成待办的优先级：重要 > 临近7天 > 普通
+  // 未完成待办的优先级：重要 > 普通
   todoPriority(t) {
     if (t.important) return 0;
-    const d = t.dayInfo && t.dayInfo.days;
-    if (d != null && d >= 0 && d <= 7) return 1;
-    return 2;
+    return 1;
   },
 
   // 完成动画结束后，把已完成的统一沉到列表底部
@@ -669,12 +935,11 @@ Page({
     if (!todo) return;
     const markLabel = todo.important ? '⭐ 取消重要' : '⭐ 设为重要';
     wx.showActionSheet({
-      itemList: [markLabel, '👤 指派给谁', '✏️ 编辑', '🗑️ 删除'],
+      itemList: [markLabel, '✏️ 编辑', '🗑️ 删除'],
       success: (res) => {
         if (res.tapIndex === 0) this.onToggleImportant(e);
-        else if (res.tapIndex === 1) this.onAssignTodo(e);
-        else if (res.tapIndex === 2) this.onEnterEdit(e);
-        else if (res.tapIndex === 3) this.onDeleteTodo(e);
+        else if (res.tapIndex === 1) this.onEnterEdit(e);
+        else if (res.tapIndex === 2) this.onDeleteTodo(e);
       },
     });
   },
@@ -685,12 +950,12 @@ Page({
     const todo = this.data.todos[index];
     if (!todo) return;
     const imp = !todo.important;
-    const prev = this.data.todos.slice();
+    const prev = this.data.todos.map((t) => ({ ...t }));
     this.setImportantLocal(todo._id, imp);
     try {
       await setImportant(todo._id, imp);
       this.suppressChange(todo._id);
-      this.fetchTodos();
+      // 列表已经本地重排过（setImportantLocal），无需再拉云端
       wx.showToast({ title: imp ? '已设为重要' : '已取消重要', icon: 'none' });
     } catch (err) {
       this.setData({ todos: prev, doneCount: prev.filter((t) => t.done).length, activeCount: prev.filter((t) => !t.done).length });
@@ -705,38 +970,7 @@ Page({
     this.renderTodos(todos);
   },
 
-  // 长按菜单：指派给谁（openid，空=两人一起）——乐观更新 + 云端落库
-  async onAssignTodo(e) {
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
-    if (!todo) return;
-    const mems = (this.data.family && this.data.family.memberNicks) || {};
-    const me = this.data.myOpenid;
-    const opts = [{ label: '👥 一起做（取消指派）', val: '' }];
-    opts.push({ label: `给我（${this.data.myNick}）`, val: me });
-    Object.keys(mems).forEach((o) => {
-      if (o !== me) opts.push({ label: `给 ${mems[o]}`, val: o });
-    });
-    wx.showActionSheet({
-      itemList: opts.map((o) => o.label),
-      success: async (res) => {
-        if (res.tapIndex < 0) return;
-        const assignee = opts[res.tapIndex].val;
-        const prev = this.data.todos.slice();
-        // 乐观更新旧先本地反映
-        this.renderTodos(prev.map((t) => (t._id === todo._id ? { ...t, assignee } : t)));
-        try {
-          await assignTodo(todo._id, assignee);
-          this.suppressChange(todo._id);
-          this.fetchTodos();
-          wx.showToast({ title: assignee ? '已指派' : '已取消指派', icon: 'none' });
-        } catch (err) {
-          this.renderTodos(prev);
-          wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-        }
-      },
-    });
-  },
+
 
   // 一键清空已完成（5 秒内可撤销）
   onClearDone() {
@@ -773,6 +1007,8 @@ Page({
   // 一次撤销即可全部恢复，超时后统一真正删除（避免前一条"丢失"导致待办复活）
   startUndo({ removed, proc }) {
     if (this._undoTimer) { clearTimeout(this._undoTimer); this._undoTimer = null; }
+    // 这些条目从此刻起进入隐藏名单：撤销窗口内、以及之后真正删库的整个过程中都不再渲染
+    this._hideTodoIds(removed.map((t) => t._id));
     const pending = (this._undo && this._undo.pending) || [];
     removed.forEach((t) => pending.push({ todo: t, proc }));
     this._undo = { pending };
@@ -790,6 +1026,7 @@ Page({
     this.setData({ undoLabel: '' });
     if (!u || !u.pending || !u.pending.length) return;
     const restored = u.pending.map((p) => p.todo);
+    this._unhideTodoIds(restored.map((t) => t._id)); // 撤销后不再隐藏，正常参与渲染
     const todos = this.data.todos.concat(restored);
     this.renderTodos(todos);
     wx.showToast({ title: '已撤销', icon: 'none' });
@@ -802,16 +1039,28 @@ Page({
     this._undoTimer = null;
     this.setData({ undoLabel: '' });
     if (!u || !u.pending || !u.pending.length) return;
+    const items = u.pending;
+    const ids = items.map((p) => p.todo && p.todo._id).filter(Boolean);
+    // 关键：删除期间继续隐藏这些条目（一直到拿到确认已删的快照），
+    // 否则会出现「撤销条消失 → 云函数还在路上 → 旧快照把条目画回来 → 再消失」。
+    this._hideTodoIds(ids);
     // 待真正删除的条目做同步静默，避免被播报成"对方删除"
-    this.suppressAll(u.pending.map((p) => p.todo));
+    this.suppressAll(items.map((p) => p.todo));
     // 去重执行各 proc：clearDoneTodos 是同一个函数引用只执行一次；
     // removeTodo 每个是独立闭包，天然一条一个，无需去重
     const procSet = new Set();
-    u.pending.forEach((p) => { if (p.proc) procSet.add(p.proc); });
+    items.forEach((p) => { if (p.proc) procSet.add(p.proc); });
     try {
       for (const proc of procSet) await proc();
-    } catch (e) { console.error('[undo] 执行失败', e); }
-    this.fetchTodos();
+      await this.fetchTodos(); // 删除已落库，拿一版干净的快照
+      this._unhideTodoIds(ids);
+    } catch (e) {
+      console.error('[undo] 执行失败', e);
+      // 删除失败：如数还回列表，别让用户以为已经删掉了
+      this._unhideTodoIds(ids);
+      this.renderTodos(this.data.todos.concat(items.map((p) => p.todo)));
+      wx.showToast({ title: '删除失败，已恢复', icon: 'none' });
+    }
   },
 
   // 为即将真正删除的条目做同步静默，避免撤销条被播报成"对方删除"
@@ -849,12 +1098,16 @@ Page({
     if (!todo) return;
     // 先把 value 写进 input，再 nextTick 聚焦，避免微信 input 的 value 与
     // focus 同帧 setData 时 value 被吞，导致看不到已有内容/像是在“追加”。
+    const remind = todo.remindAt ? new Date(todo.remindAt) : null;
+    const p2 = (x) => String(x).padStart(2, '0');
+    const remindDate = remind ? `${remind.getFullYear()}-${p2(remind.getMonth() + 1)}-${p2(remind.getDate())}` : '';
+    const remindTime = remind ? `${p2(remind.getHours())}:${p2(remind.getMinutes())}` : '';
     this.setData({
       editing: true,
       editingId: todo._id,
       inputVal: todo.content || '',
-      inputDeadline: todo.deadline || '',
-      inputDeadlineText: deadlineChipText(todo.deadline || ''),
+      inputRemindDate: remindDate,
+      inputRemindTime: remindTime,
       inputFocus: false,
     });
     const that = this;
@@ -885,21 +1138,90 @@ Page({
 
   // 取消编辑
   cancelEdit() {
-    this.setData({ editing: false, editingId: '', inputVal: '', inputDeadline: '', inputDeadlineText: '', inputFocus: false });
+    this.setData({ editing: false, editingId: '', inputVal: '', inputRemindDate: '', inputRemindTime: '', inputFocus: false, kbHeight: 0 });
   },
 
   async saveEdit(content) {
+    const remindAt = this.composeRemindAt(this.data.inputRemindDate, this.data.inputRemindTime); // 先缓存，cancelEdit 会清空
+    // 设了提醒但时刻已过：拦截，避免改成无效提醒
+    if (remindAt && remindAt <= Date.now()) {
+      wx.showToast({ title: '提醒时刻已过，请选未来的时间', icon: 'none' });
+      return;
+    }
+    // 同上：订阅授权先于任何 await 发起，保住用户手势上下文
+    const authOk = remindAt ? await requestTodoReminder() : null;
+    if (!remindAt) this.maybeRenewRemindQuota();
     wx.showLoading({ title: '保存中' });
     try {
-      await editTodo(this.data.editingId, content, this.data.inputDeadline);
-      this.suppressChange(this.data.editingId);
+      await editTodo(this.data.editingId, content, remindAt);
+      const editingId = this.data.editingId;
+      this.suppressChange(editingId);
       this.cancelEdit();
-      this.fetchTodos(); // 立刻刷新，编辑零延迟可见
+      // 就地更新即可，不必再整表重拉
+      this.patchLocalTodo(editingId, { content, remindAt: remindAt || null, remindText: fmtRemind(remindAt) });
       wx.hideLoading();
+      if (remindAt) this.toastRemindAuth(authOk);
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: e.message || '保存失败', icon: 'none' });
     }
+  },
+
+  // —— 提醒授权引导 ——
+  // 为什么要引导：订阅消息必须用户本人点授权才能收到，而家庭另一半很少主动去「我的」页，
+  // 没有引导就会出现「A 设了提醒，B 永远收不到」。
+  refreshRemindGuide() {
+    const authorized = !!wx.getStorageSync('remindAuthorized');
+    const dismissed = !!wx.getStorageSync('remindGuideDismissed');
+    // 不依赖 hasFamily（首屏时 hasFamily 可能还没准备好），模板里再与 hasFamily 一起判断
+    this.setData({
+      remindNeedAuth: !authorized,
+      showRemindGuide: !authorized && !dismissed,
+    });
+  },
+
+  markRemindAuthorized() {
+    wx.setStorageSync('remindAuthorized', 1);
+    this.setData({ showRemindGuide: false, remindNeedAuth: false });
+    if (app.checkRemindSetting) app.checkRemindSetting();
+  },
+
+  // 点引导条：直接发起授权（必须在本点击回调里调用）
+  async onEnableRemindGuide() {
+    const ok = await requestTodoReminder();
+    if (ok) {
+      this.markRemindAuthorized();
+      wx.showModal({
+        title: '已开启 ✅',
+        content: '以后待办到点会微信通知你。\n\n小提示：刚才的弹窗里如果勾了「总是保持以上选择」，以后会自动续上额度，不用反复点。',
+        showCancel: false,
+        confirmText: '知道啦',
+      });
+    } else {
+      wx.showToast({ title: '未开启，到点不会收到微信通知', icon: 'none' });
+    }
+  },
+
+  onCloseRemindGuide() {
+    wx.setStorageSync('remindGuideDismissed', 1);
+    this.setData({ showRemindGuide: false });
+  },
+
+  // 订阅授权结果提示
+  toastRemindAuth(ok) {
+    if (ok) {
+      this.markRemindAuthorized();
+      wx.showToast({ title: '已开启提醒 ✨ 到点通知你', icon: 'none' });
+    } else {
+      wx.showToast({ title: '通知未授权，到点不会提醒', icon: 'none' });
+    }
+  },
+  // 键盘高度变化：底部输入栏/编辑面板整体上顶，
+  // 解决「输入框上方只看到键盘的『完成』按钮、点不到保存」的问题。
+  onKbHeight(e) {
+    const h = (e && e.detail && e.detail.height) || 0;
+    if (h === this.data.kbHeight) return;
+    this.setData({ kbHeight: h });
   },
 
   goCreate() {

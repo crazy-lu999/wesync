@@ -12,10 +12,13 @@ exports.main = async () => {
     return { code: 0, data: { family: null, todos: [] } };
   }
   const family = famRes.data[0];
+  // 云函数端默认只返回 100 条，待办积得久了（尤其已完成不清理）会静默丢数据，
+  // 显式放大到服务端上限 1000 条。
   const todosRes = await db.collection('todos')
     .where({ familyId: family._id })
     .orderBy('done', 'asc')
     .orderBy('createTime', 'desc')
+    .limit(1000)
     .get();
   return {
     code: 0,

@@ -10,9 +10,9 @@
   <view wx:elif="{{!hasFamily}}" class="guide">
     <view class="guide-emoji">🏡</view>
     <view class="guide-title">建立一个你们的小家</view>
-    <view class="guide-sub muted">创建家庭后把邀请码发给另一半，<br/>两人就能共享同一个待办清单啦</view>
+    <view class="guide-sub muted">建个小家，把邀请码发给 TA<br/>两人共享一份待办清单</view>
     <button class="btn-primary guide-btn" bindtap="goCreate">创建家庭</button>
-    <button class="btn-ghost guide-btn" bindtap="goJoin">我有邀请码，加入</button>
+    <button class="btn-ghost guide-btn" bindtap="goJoin">有邀请码，加入</button>
   </view>
 
   <!-- 有家庭：列表 -->
@@ -24,6 +24,16 @@
 快重启去拆礼物吧 ❤️</text>
       <text class="update-banner-arrow">›</text>
     </view>
+    <!-- 提醒授权引导条：没授权过时提示开启（可关闭） -->
+    <view wx:if="{{hasFamily && showRemindGuide}}" class="remind-guide">
+      <text class="remind-guide-emoji">🔔</text>
+      <view class="remind-guide-body" bindtap="onEnableRemindGuide">
+        <text class="remind-guide-title">开启微信提醒</text>
+        <text class="remind-guide-sub">待办到点微信通知你，弹窗里记得勾「总是保持以上选择」</text>
+      </view>
+      <text class="remind-guide-x" catchtap="onCloseRemindGuide">✕</text>
+    </view>
+
     <!-- 语义化同步事件提示条 -->
     <view wx:if="{{syncTip}}" class="sync-event-tip">{{syncTip}}</view>
 
@@ -34,7 +44,7 @@
       <text class="offline-arrow">↻</text>
     </view>
 
-    <!-- 亲密卡：每天一句窝心话 + 纪念日；右上角是「我的」入口（不占独立行） -->
+    <!-- 亲密卡：每天一句窝心话 + 纪念日；右侧「小家」胶囊入口 -->
     <view class="warm-card">
       <view class="warm-art">
         <view class="warm-bubble">💌</view>
@@ -44,6 +54,10 @@
         <!-- 倒计时：距离 X 还有 N 天 -->
         <view wx:if="{{annivInfo.nextLabel}}" class="warm-next-line">💍 {{annivInfo.nextLabel}}</view>
         <view wx:else class="warm-next-line link" bindtap="goMe">记下纪念日 🤍</view>
+      </view>
+      <view class="warm-capsule" bindtap="goMe" hover-class="warm-capsule-hover">
+        <text class="warm-capsule-icon">🏠</text>
+        <text class="warm-capsule-text">我的</text>
       </view>
     </view>
 
@@ -104,13 +118,12 @@
           </view>
           <view class="todo-meta">
             <text class="creator {{item.mine ? 'mine' : ''}}">{{item.creatorNick}}</text>
-            <text wx:if="{{item.assignee}}" class="assign-tag {{item.assignToMe ? 'mine' : ''}}">👤 {{item.assignNick}}</text>
             <text wx:if="{{item.done}}" class="meta-done">✓ {{item.doneNick || '已完成'}}</text>
             <text class="muted">{{item.done && item.doneTimeText ? item.doneTimeText : item.timeText}}</text>
-            <!-- 截止日期倒计时徽标（跟在创建人/时间后面） -->
-            <view wx:if="{{item.dayInfo && !item.done}}" class="cd-badge {{item.dayInfo.state}}">
-              <text class="cd-label">⏰ {{item.dayInfo.label}}</text>
-              <text class="cd-text">{{item.dayInfo.text}}</text>
+            <!-- 提醒徽标（跟在创建人/时间后面）：显示「将提醒于 X月X日 HH:MM」 -->
+            <view wx:if="{{item.remindText && !item.done}}" class="cd-badge normal">
+              <text class="cd-label">🔔</text>
+              <text class="cd-text">将提醒 {{item.remindText}}</text>
             </view>
           </view>
         </view>
@@ -125,7 +138,7 @@
         <text class="sync-dot green">●</text> 实时同步中，对方改动即时可见
       </block>
       <block wx:else>
-        <text class="sync-dot amber">●</text> 已同步 · 对方改动约几秒内出现
+        <text class="sync-dot amber">●</text> 已同步 · 对方改动约十秒内出现
       </block>
     </view>
   </view>
@@ -137,7 +150,7 @@
   </view>
 
   <!-- 底部输入栏（仅在有家庭时显示） -->
-  <view wx:if="{{hasFamily}}" class="input-wrap {{editing ? 'editing' : ''}}">
+  <view wx:if="{{hasFamily}}" class="input-wrap {{editing ? 'editing' : ''}}" style="{{kbHeight ? 'padding-bottom:' + (kbHeight + 16) + 'px;' : ''}}">
     <!-- 编辑态：完整面板，展示原内容 + 输入框 + 操作按钮，不再和按钮挤在一行 -->
     <block wx:if="{{editing}}">
       <view class="edit-panel">
@@ -153,16 +166,29 @@
           auto-height
           maxlength="140"
           cursor-spacing="140"
+          adjust-position="{{false}}"
+          show-confirm-bar="{{false}}"
+          bindkeyboardheightchange="onKbHeight"
           bindinput="onInput"
         ></textarea>
-        <!-- 编辑态：截止日期 -->
-        <picker mode="date" value="{{today}}" start="{{today}}" bindchange="onPickDeadline" class="cd-picker">
-          <view class="cd-chip wide {{inputDeadline ? 'set' : ''}}">
-            <block wx:if="{{inputDeadline}}">
-              <text class="cd-chip-set">⏰ {{inputDeadlineText}}</text>
-              <text class="cd-chip-x" catchtap="onClearDeadline">✕</text>
+        <!-- 编辑态：提醒日期 -->
+        <picker mode="date" value="{{inputRemindDate || today}}" start="{{today}}" bindchange="onPickRemindDate" class="cd-picker">
+          <view class="cd-chip wide {{inputRemindDate ? 'set' : ''}}">
+            <block wx:if="{{inputRemindDate}}">
+              <text class="cd-chip-set">📅 {{inputRemindDate}}</text>
+              <text class="cd-chip-x" catchtap="onClearRemindDate">✕</text>
             </block>
-            <text wx:else>⏰ 倒计时</text>
+            <text wx:else>📅 提醒日期</text>
+          </view>
+        </picker>
+        <!-- 编辑态：提醒时间（选了日期后出现） -->
+        <picker wx:if="{{inputRemindDate}}" mode="time" value="{{inputRemindTime || '08:00'}}" bindchange="onPickRemindTime" class="cd-picker">
+          <view class="cd-chip {{inputRemindTime ? 'set' : ''}}">
+            <block wx:if="{{inputRemindTime}}">
+              <text class="cd-chip-set">🔔 {{inputRemindTime}}</text>
+              <text class="cd-chip-x" catchtap="onClearRemind">✕</text>
+            </block>
+            <text wx:else>🔔 提醒时间</text>
           </view>
         </picker>
         <view class="edit-actions">
@@ -171,32 +197,49 @@
         </view>
       </view>
     </block>
-    <!-- 普通态：单行输入 + 添加 -->
+    <!-- 普通态：输入 + 添加固定一行；提醒等选项在下方独立一行，可换行不挤压 -->
     <block wx:else>
       <view class="input-bar">
-        <textarea
-          class="input-line"
-          placeholder="记一笔家庭待办…"
-          value="{{inputVal}}"
-          focus="{{inputFocus}}"
-          auto-height
-          maxlength="140"
-          cursor-spacing="140"
-          bindinput="onInput"
-        ></textarea>
-        <!-- 新建态：截止日期（有输入内容时作为可选项出现，用户自选） -->
-        <picker wx:if="{{inputVal}}" mode="date" value="{{today}}" start="{{today}}" bindchange="onPickDeadline" class="cd-picker">
-          <view class="cd-chip {{inputDeadline ? 'set' : ''}}">
-            <block wx:if="{{inputDeadline}}">
-              <text class="cd-chip-set">⏰ {{inputDeadlineText}}</text>
-              <text class="cd-chip-x" catchtap="onClearDeadline">✕</text>
-            </block>
-            <text wx:else>⏰ 倒计时</text>
-          </view>
-        </picker>
-        <!-- 新建态：指派给谁 chip -->
-        <view wx:if="{{inputVal}}" class="assign-chip {{assignFor ? 'set' : ''}}" bindtap="onPickAssign" hover-class="assign-hover">{{assignForText}}</view>
-        <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
+        <view class="input-row">
+          <textarea
+            class="input-line"
+            placeholder="记一笔家庭待办…"
+            value="{{inputVal}}"
+            focus="{{inputFocus}}"
+            auto-height
+            maxlength="140"
+            cursor-spacing="140"
+            adjust-position="{{false}}"
+            show-confirm-bar="{{false}}"
+            bindkeyboardheightchange="onKbHeight"
+            bindinput="onInput"
+          ></textarea>
+          <button class="add-btn {{inputVal ? '' : 'disable'}}" bindtap="onAdd">添加</button>
+        </view>
+        <view wx:if="{{inputVal}}" class="input-chips">
+          <!-- 新建态：提醒日期（有输入内容时出现，用户自选） -->
+          <picker mode="date" value="{{inputRemindDate || today}}" start="{{today}}" bindchange="onPickRemindDate" class="cd-picker">
+            <view class="cd-chip {{inputRemindDate ? 'set' : ''}}">
+              <block wx:if="{{inputRemindDate}}">
+                <text class="cd-chip-set">📅 {{inputRemindDate}}</text>
+                <text class="cd-chip-x" catchtap="onClearRemindDate">✕</text>
+              </block>
+              <text wx:else>📅 提醒日期</text>
+            </view>
+          </picker>
+          <!-- 新建态：提醒时间（选了日期后出现） -->
+          <picker wx:if="{{inputRemindDate}}" mode="time" value="{{inputRemindTime || '08:00'}}" bindchange="onPickRemindTime" class="cd-picker">
+            <view class="cd-chip {{inputRemindTime ? 'set' : ''}}">
+              <block wx:if="{{inputRemindTime}}">
+                <text class="cd-chip-set">🔔 {{inputRemindTime}}</text>
+                <text class="cd-chip-x" catchtap="onClearRemind">✕</text>
+              </block>
+              <text wx:else>🔔 提醒时间</text>
+            </view>
+          </picker>
+          <!-- 补授权提示：选了时间但还没授权提醒时提醒一下 -->
+          <view wx:if="{{inputRemindDate && inputRemindTime && remindNeedAuth}}" class="remind-hint" bindtap="onEnableRemindGuide">点这里先授权，弹窗里勾「总是保持以上选择」，到点才能收到通知 ›</view>
+        </view>
       </view>
     </block>
   </view>
@@ -211,11 +254,36 @@
     >{{item.emoji}}</view>
   </view>
 
-  <!-- 整屏右下角悬浮「我的」入口（类似刷新悬浮钮） -->
-  <view wx:if="{{hasFamily}}" class="my-fab" bindtap="goMe" hover-class="my-fab-hover">
-    <view class="my-fab-heart">♥</view>
-    <view class="my-fab-icon">🏠</view>
-    <view class="my-fab-label">小家</view>
+  <!-- 版本更新弹窗：自定义布局，更新点严格左对齐 -->
+  <view
+    wx:if="{{releaseModal.visible}}"
+    class="release-mask"
+    catchtap="onCloseReleaseModal"
+    catchtouchmove="noop"
+  >
+    <view class="release-dialog" catchtap="noop">
+      <view class="release-dialog-head">
+        <text class="release-dialog-title">{{releaseModal.title}}</text>
+        <text wx:if="{{releaseModal.version}}" class="release-dialog-version">v{{releaseModal.version}}</text>
+      </view>
+
+      <view class="release-dialog-notes">
+        <view wx:for="{{releaseModal.notes}}" wx:key="*this" class="release-note-row">
+          <view class="release-note-dot"></view>
+          <text class="release-note-text">{{item}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{releaseModal.tip}}" class="release-dialog-tip">{{releaseModal.tip}}</view>
+
+      <view class="release-dialog-actions">
+        <block wx:if="{{releaseModal.mode === 'update'}}">
+          <view class="release-btn ghost" bindtap="onCloseReleaseModal">稍后</view>
+          <view class="release-btn primary" bindtap="onConfirmUpdate">去更新</view>
+        </block>
+        <view wx:else class="release-btn primary" bindtap="onCloseReleaseModal">知道啦</view>
+      </view>
+    </view>
   </view>
 
 </view>

@@ -17,9 +17,15 @@ exports.main = async () => {
   const remain = family.members.filter((m) => m !== OPENID);
 
   if (remain.length === 0) {
-    // 最后一人离开：删该家庭所有 todos，再删 family
-    const todos = await db.collection('todos').where({ familyId: family._id }).get();
-    await Promise.all(todos.data.map((t) => db.collection('todos').doc(t._id).remove()));
+    // 最后一人离开：删该家庭所有 todos，再删 family。
+    // 注意：.get() 默认只取 100 条，必须分页循环，否则待办超过 100 条时会留下孤儿数据。
+    for (;;) {
+      const page = await db.collection('todos').where({ familyId: family._id }).limit(100).get();
+      const list = page.data || [];
+      if (!list.length) break;
+      await Promise.all(list.map((t) => db.collection('todos').doc(t._id).remove()));
+      if (list.length < 100) break;
+    }
     await db.collection('families').doc(family._id).remove();
   } else {
     const memberNicks = { ...family.memberNicks };

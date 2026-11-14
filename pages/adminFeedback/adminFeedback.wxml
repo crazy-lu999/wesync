@@ -1,0 +1,52 @@
+<!--pages/adminFeedback/adminFeedback.wxml — 反馈管理（仅开发者本人）-->
+<view class="page">
+
+  <view wx:if="{{loading}}" class="state card">
+    <view class="state-emoji">⏳</view>
+    <view class="state-title">加载中…</view>
+  </view>
+
+  <view wx:elif="{{denied}}" class="state card">
+    <view class="state-emoji">🔒</view>
+    <view class="state-title">仅开发者可访问</view>
+    <view class="state-sub muted">当前微信号没有反馈管理权限。</view>
+  </view>
+
+  <block wx:else>
+    <view class="stat-bar">
+      <text>共 {{list.length}} 条</text>
+      <text class="unread">未读 {{unread}}</text>
+      <text class="refresh" bindtap="load">刷新</text>
+    </view>
+
+    <view wx:if="{{!list.length}}" class="state card">
+      <view class="state-emoji">📭</view>
+      <view class="state-title">还没有反馈</view>
+      <view class="state-sub muted">用户提交后会出现在这里。</view>
+    </view>
+
+    <view wx:else class="list">
+      <view class="fb-card card {{item.read ? 'read' : ''}}" wx:for="{{list}}" wx:key="id">
+        <view
+          class="fb-content"
+          data-content="{{item.content}}"
+          bindlongpress="onCopy"
+          hover-class="content-hover"
+        >{{item.content}}</view>
+        <view class="fb-foot">
+          <view class="fb-meta">
+            <text wx:if="{{!item.read}}" class="dot"></text>
+            <text class="time">{{item.timeText}}</text>
+            <text wx:if="{{item.userSuffix}}" class="user">用户…{{item.userSuffix}}</text>
+          </view>
+          <view class="fb-ops">
+            <view wx:if="{{!item.read}}" class="op" data-id="{{item.id}}" bindtap="onMarkRead">标为已读</view>
+            <view class="op danger" data-id="{{item.id}}" bindtap="onDelete">删除</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="hint muted">长按反馈内容可复制</view>
+  </block>
+</view>

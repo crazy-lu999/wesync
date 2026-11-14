@@ -3,13 +3,13 @@
   <view class="head">
     <view class="head-emoji">🔑</view>
     <view class="head-title">加入家庭</view>
-    <view class="muted head-sub">输入 TA 发你的 6 位邀请码</view>
+    <view class="muted head-sub">输入 TA 给你的 6 位邀请码</view>
   </view>
 
   <view class="form card">
-    <view wx:if="{{preFilled}}" class="prefill-tip">🎉 已带入 TA 的邀请码，起个昵称就能加入啦</view>
+    <view wx:if="{{preFilled}}" class="prefill-tip">🎉 邀请码已填好，起个昵称就行</view>
     <view class="field">
-      <view class="label">邀请码（6 位数字）</view>
+      <view class="label">邀请码</view>
       <input
         class="input-line code-input"
         data-field="inviteCode"
@@ -22,7 +22,7 @@
     </view>
 
     <view class="field">
-      <view class="label">你的昵称（对方会看到）</view>
+      <view class="label">你的昵称</view>
       <view class="input-wrap">
         <text class="input-icon">🙋</text>
         <input
@@ -31,7 +31,7 @@
           value="{{myNick}}"
           focus="{{preFilled}}"
           bindinput="onInput"
-          placeholder="比如：老公 / 老婆"
+          placeholder="老公 / 老婆"
           maxlength="10"
         />
       </view>

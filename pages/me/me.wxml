@@ -63,7 +63,14 @@
           bindlongpress="onPhotoMenu"
           hover-class="cell-hover"
         >
-          <image class="photo-img" src="{{item.url}}" mode="aspectFill" lazy-load/>
+          <image
+            class="photo-img"
+            src="{{item.url}}"
+            mode="aspectFill"
+            lazy-load
+            data-fileid="{{item.fileID}}"
+            binderror="onPhotoError"
+          />
         </view>
       </view>
 
@@ -88,16 +95,18 @@
           <view
             wx:for="{{annivs}}"
             wx:key="id"
-            class="anniv-item"
+            class="anniv-item tone-{{index % 4}}"
             data-id="{{item.id}}"
             bindtap="onEditAnniv"
             hover-class="cell-hover"
           >
             <view class="anniv-item-left">
               <view class="anniv-item-title">{{item.title}}</view>
-              <block wx:if="{{item.countdown === 0}}"><view class="anniv-item-date muted">{{item.date}} · 今天 🎉</view></block>
-              <block wx:elif="{{item.countdown > 0}}"><view class="anniv-item-date muted">{{item.date}} · 距离还有 {{item.countdown}} 天</view></block>
-              <block wx:else><view class="anniv-item-date muted">{{item.date}}</view></block>
+              <view class="anniv-item-date">
+                <text class="anniv-date-text">{{item.date}}</text>
+                <text wx:if="{{item.countdown === 0}}" class="anniv-count today">就是今天 🎉</text>
+                <text wx:elif="{{item.countdown > 0}}" class="anniv-count">还有 {{item.countdown}} 天</text>
+              </view>
             </view>
             <view class="anniv-edit-chip">✎</view>
           </view>
@@ -137,9 +146,9 @@
           <view class="copy-btn">复制</view>
         </view>
       </view>
-      <button class="btn-primary share-invite" open-type="share">🎁 发卡片给 TA，点开一键加入</button>
+      <button class="btn-primary share-invite" open-type="share">🎁 分享给 TA</button>
       <view wx:if="{{members.length < 2}}" class="muted tip">
-        或把邀请码复制发给 TA 也行
+        或复制邀请码发给 TA
       </view>
     </view>
 
@@ -148,7 +157,7 @@
       <view class="card-title">
         <text class="card-title-icon">👥</text>
         <text>家庭成员（{{members.length}}/2）</text>
-        <text wx:if="{{!editingNick}}" class="nick-hint">点头像换头像 / 点名字可改名</text>
+        <text wx:if="{{!editingNick}}" class="nick-hint">点名字可改名</text>
       </view>
       <view class="members">
         <view
@@ -159,14 +168,9 @@
           bindtap="onMemberTap"
           hover-class="member-hover"
         >
-          <button wx:if="{{item.me}}" class="avatar-picker" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar" catchtap="noop" aria-label="更换头像">
-            <image wx:if="{{item.avatar}}" class="avatar-img" src="{{item.avatar}}" mode="aspectFill" data-index="{{index}}" binderror="onAvatarError"/>
-            <text wx:else class="avatar-letter">{{item.nick ? item.nick[0] : '我'}}</text>
-            <view class="avatar-cam">📷</view>
-          </button>
-          <view wx:else class="avatar">
-            <image wx:if="{{item.avatar}}" class="avatar-img" src="{{item.avatar}}" mode="aspectFill" data-index="{{index}}" binderror="onAvatarError"/>
-            <text wx:else class="avatar-letter">{{item.nick ? item.nick[0] : '我'}}</text>
+          <!-- 头像：首字母圆标（我=珊瑚橙、TA=葆粉，一眼分得清） -->
+          <view class="avatar {{item.me ? 'avatar-me' : 'avatar-ta'}}">
+            <text class="avatar-letter">{{item.nick ? item.nick[0] : '我'}}</text>
           </view>
           <view class="m-name">{{item.nick}}</view>
           <view class="member-meta">
@@ -197,6 +201,18 @@
       </view>
     </view>
 
+    <!-- 开启微信提醒入口 -->
+    <view class="card help-entry" hover-class="help-hover" bindtap="onEnableRemind">
+      <view class="help-left">
+        <text class="card-title-icon">🔔</text>
+        <text class="help-label">开启微信提醒</text>
+      </view>
+      <view class="help-right">
+        <text class="muted">点一下授权，记得勾「总是」</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
     <!-- 使用说明入口 -->
     <view class="card help-entry" hover-class="help-hover" bindtap="goGuide">
       <view class="help-left">
@@ -209,14 +225,38 @@
       </view>
     </view>
 
-    <!-- 建议墙入口 -->
-    <view class="card help-entry" hover-class="help-hover" bindtap="goWall">
+    <!-- 更新日志入口 -->
+    <view class="card help-entry" hover-class="help-hover" bindtap="goReleaseNotes">
       <view class="help-left">
-        <text class="card-title-icon">💡</text>
-        <text class="help-label">建议墙</text>
+        <text class="card-title-icon">🗒️</text>
+        <text class="help-label">更新日志</text>
       </view>
       <view class="help-right">
-        <text class="muted">有想法告诉我，都会认真看</text>
+        <text class="muted">看看最近更新了什么</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
+    <!-- 意见反馈入口（私密，仅开发者可见） -->
+    <view class="card help-entry" hover-class="help-hover" bindtap="goFeedback">
+      <view class="help-left">
+        <text class="card-title-icon">💬</text>
+        <text class="help-label">意见反馈</text>
+      </view>
+      <view class="help-right">
+        <text class="muted">告诉我们你的想法</text>
+        <text class="chev-plus">›</text>
+      </view>
+    </view>
+
+    <!-- 反馈管理入口（仅开发者本人可见） -->
+    <view wx:if="{{isAdmin}}" class="card help-entry" hover-class="help-hover" bindtap="goAdminFeedback">
+      <view class="help-left">
+        <text class="card-title-icon">🛠️</text>
+        <text class="help-label">反馈管理</text>
+      </view>
+      <view class="help-right">
+        <text class="muted">仅你可见 · 查看用户反馈</text>
         <text class="chev-plus">›</text>
       </view>
     </view>

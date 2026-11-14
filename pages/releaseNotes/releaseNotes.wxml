@@ -1,0 +1,31 @@
+<!--pages/releaseNotes/releaseNotes.wxml — 更新日志-->
+<view class="page">
+
+  <view class="hero card">
+    <view class="hero-emoji">🗒️</view>
+    <view class="hero-title">更新日志</view>
+    <view class="hero-sub muted">当前版本 v{{version}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading muted">加载中…</view>
+
+  <block wx:else>
+    <view wx:if="{{!history.length}}" class="empty muted">暂无更新记录</view>
+
+    <view wx:for="{{history}}" wx:key="version" class="card release-card">
+      <view class="release-head">
+        <text class="ver-badge">v{{item.version}}</text>
+        <text class="release-title">{{item.title}}</text>
+        <text wx:if="{{item.date}}" class="release-date muted">{{item.date}}</text>
+      </view>
+      <view class="release-notes">
+        <view wx:for="{{item.notes}}" wx:for-item="note" wx:key="*this" class="note-row">
+          <text class="note-dot">•</text>
+          <text class="note-text">{{note}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="foot muted">每一次更新，都是为了让你们用得更顺手 💛</view>
+</view>

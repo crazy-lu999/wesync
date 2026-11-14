@@ -45,8 +45,9 @@ exports.main = async (event) => {
     if (!merge.length) return { code: 0, message: '无新增照片', data: { photos } };
 
     let all = photos.concat(merge);
-    const finalList = all.slice(0, MAX_PHOTOS);
-    const dropped = all.slice(MAX_PHOTOS);
+    // 超过上限时保留最新的 9 张（删除最旧的），而不是把新传的直接丢掉
+    const finalList = all.slice(-MAX_PHOTOS);
+    const dropped = all.length > MAX_PHOTOS ? all.slice(0, all.length - MAX_PHOTOS) : [];
     if (dropped.length) {
       try { await cloud.deleteFile({ fileList: dropped }); } catch (e) { console.error(e); }
     }

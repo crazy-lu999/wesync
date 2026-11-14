@@ -44,9 +44,10 @@ Page({
     wx.reLaunch({ url: '/pages/index/index' });
   },
 
-  // 转发给朋友：统一品牌卡，引导新用户建自己的小家（分享诉求只有拉新家庭）
+  // 转发给朋友：刚建完家庭时带上邀请码 → 对方点开直达加入页并预填邀请码
   onShareAppMessage() {
-    return buildShare();
+    const code = (this.data.result && this.data.result.inviteCode) || '';
+    return buildShare({ inviteCode: code });
   },
 
   onShareTimeline() {

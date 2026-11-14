@@ -5,6 +5,8 @@
     "pages/join/join",
     "pages/me/me",
     "pages/wall/wall",
+    "pages/adminFeedback/adminFeedback",
+    "pages/releaseNotes/releaseNotes",
     "pages/guide/guide"
   ],
   "window": {
