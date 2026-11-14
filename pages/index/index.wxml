@@ -72,10 +72,10 @@
         <view class="stat-label">已完成</view>
       </view>
       <view class="stat-divider"></view>
-      <!-- 笔记：与待办/已完成并列，是入口，点击进入「我们的记录」 -->
+      <!-- 记录：与待办/已完成并列，是入口，点击进入「我们的记录」 -->
       <view class="stat-item notes-stat" bindtap="goNotes" hover-class="stat-hover">
         <view class="stat-num notes-num">{{noteCount}}</view>
-        <view class="stat-label">笔记</view>
+        <view class="stat-label">记录</view>
       </view>
     </view>
 
