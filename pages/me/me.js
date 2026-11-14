@@ -1,11 +1,12 @@
 // pages/me/me.js
-const { getMyFamily, leaveFamily, updateNickname, updateAvatar, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary } = require('../../utils/db.js');
+const { getMyFamily, leaveFamily, updateNickname, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary, requestTodoReminder } = require('../../utils/db.js');
 const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
 // 由 (family, openid) 生成页面视图数据。
 // 注意：photos 是云存储 fileID，photoUrls 是云函数下发的临时可访问 URL（跨成员可看）。
+// urlByFile：当前页面上「已经在显示」的 fileID → URL 映射，传入后优先复用它。
 function fmtAnnivDate(s) {
   const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s || '');
   return m ? `${+m[2]}月${+m[3]}日` : '';
@@ -21,26 +22,38 @@ function countdownDays(s) {
   if (next < today) next.setFullYear(now.getFullYear() + 1);
   return Math.round((next - today) / 86400000);
 }
-function buildView(family, openid) {
+function buildView(family, openid, urlByFile, forceFresh) {
   const memberNicks = (family && family.memberNicks) || {};
   const myNick = memberNicks[openid] || '我';
-  const memberAvatars = (family && family.memberAvatars) || {};
   const members = ((family && family.members) || []).map((o) => ({
     openid: o,
     nick: memberNicks[o] || '成员',
-    avatar: memberAvatars[o] || '',
     me: o === openid,
   }));
   const photos = (family && family.photos) || [];
-  // 优先用云函数返回的临时 URL；老缓存没有时回退为 fileID
-  const photoUrls = family && Array.isArray(family.photoUrls) ? family.photoUrls : photos.slice();
+  // 展示用 URL 的优先级：
+  //   ① 页面上已经显示过的 URL（urlByFile）—— src 不变 → 命中微信图片缓存，不重新下载、不闪
+  //   ② 云函数本次返回的临时 URL（family.photoUrls）
+  //   ③ 老数据/老缓存没有 URL 时回退 fileID
+  // 为什么不能直接无脑用 ②：getTempFileURL 每次调用返回的签名 URL 都不一样，把新 URL
+  // 塞给 <image> 会被当成「换了张图」重新拉取 + 解码，表现就是每次进相片墙照片闪一下。
+  const serverUrls = (family && Array.isArray(family.photoUrls)) ? family.photoUrls : [];
+  // 正常情况优先复用已显示过的 URL（src 不变 → 命中微信图片缓存，不重下、不闪）。
+  // 但对已被标记为「旧 URL 失效、需强制换新」的相片，直接用云端本次下发的临时 URL，
+  // 避免冷启动首次进相片墙时因为竞态一直卡在过期 URL 上刷不出来。
+  const photoUrls = photos.map((f, i) => {
+    const pinned = urlByFile && urlByFile[f];
+    if (pinned && !(forceFresh && forceFresh[f])) return pinned;
+    return serverUrls[i] || f;
+  });
   // 网格展示清单：每项保留它在 photos 里的原始下标 index，供预览/菜单正确定位 photoUrls / photos。
   const gridPhotos = photos.map((f, i) => ({ fileID: f, url: photoUrls[i], index: i }));
   return {
     family: family || null,
     myOpenid: openid || '',
     myNick,
-    myAvatar: memberAvatars[openid] || '',
+    // 仅开发者本人可见的「反馈管理」入口；真正权限在云函数 adminFeedback 校验
+    isAdmin: !!openid && openid === config.ADMIN_OPENID,
     members,
     photos,
     photoUrls,
@@ -58,20 +71,12 @@ function buildView(family, openid) {
   };
 }
 
-// 时间格式化：Date/aO 对象 → 'YYYY-MM-DD HH:mm'
-function fmtTime(d) {
-  if (!d) return '';
-  const date = new Date(d);
-  if (isNaN(date.getTime())) return '';
-  const p = (n) => (n < 10 ? '0' + n : '' + n);
-  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}`;
-}
-
 Page({
   data: {
     family: null,
     myOpenid: '',
     myNick: '我',
+    isAdmin: false,
     members: [],
     photos: [], // 云存储 fileID 列表
     photoUrls: [], // 与 photos 一一对应的临时可访问 URL（对方也能看图）
@@ -103,15 +108,73 @@ Page({
     const cachedFamily = app.globalData.family || wx.getStorageSync('myFamily');
     const cachedOpenid = app.globalData.openid || wx.getStorageSync('myOpenid');
     if (cachedFamily && cachedOpenid) {
-      this.setData({ ...buildView(cachedFamily, cachedOpenid), loading: false });
+      // 复用上一轮已显示的图片 URL（没有就用缓存里的），保证 <image> 的 src 不变
+      const view = buildView(cachedFamily, cachedOpenid, this._urlByFile || {}, this._photoRetry || {});
+      this._rememberUrls(view);
+      this.setData({ ...view, loading: false });
     }
     // 后台静默拉一次最新家庭数据覆盖，保证成员/昵称/照片是最新的
     this.load();
   },
 
+  // 记录「页面上正在显示的 fileID → URL」，后续渲染沿用，避免 src 变化导致图片重新下载
+  _rememberUrls(view) {
+    const map = {};
+    ((view && view.gridPhotos) || []).forEach((p) => { if (p.fileID && p.url) map[p.fileID] = p.url; });
+    this._urlByFile = map;
+  },
+
   // 用云函数返回的最新家庭数据渲染视图（照片临时 URL 已由云端解析好）
+  // ⭐ 关键：不直接采用新的临时 URL，而是沿用页面上已显示的 URL —— 否则 <image> 的
+  // src 变了，微信会重新下载 + 解码，表现就是「每次进相片墙都闪一下」。
   applyFamily(family, openid, extra) {
-    this.setData({ ...buildView(family, openid), ...(extra || {}) });
+    // 记下云端本次返回的新 URL，留给「URL 过期、图片加载失败」时兜底替换
+    const server = {};
+    const photos = (family && family.photos) || [];
+    ((family && family.photoUrls) || []).forEach((u, i) => {
+      if (photos[i] && u) server[photos[i]] = u;
+    });
+    if (Object.keys(server).length) this._serverUrls = server;
+
+    const view = buildView(family, openid, this._urlByFile || {}, this._photoRetry || {});
+    // 经历过「旧 URL 失效需换新」的格子，这一轮已经吃上最新 URL 池，复位重试标记；
+    // 若仍有相片加载失败，会再次走进 onPhotoError 补齐。
+    this._photoRetry = {};
+    // 新照片（本次新出现的 fileID）用的是云端新 URL，一并记下来
+    this._rememberUrls(view);
+    // 缓存里存「实际显示的 URL」，下次冷启动/新开页面复用同一批 URL，继续命中图片缓存
+    view.family = this._cacheFamily(family, view);
+    this.setData({ ...view, ...(extra || {}) });
+  },
+
+  _cacheFamily(family, view) {
+    const cached = { ...(family || {}), photoUrls: (view && view.photoUrls) || [] };
+    app.globalData.family = cached;
+    try { wx.setStorageSync('myFamily', cached); } catch (e) { /* 存储异常忽略 */ }
+    return cached;
+  },
+
+  // 临时 URL 过期（getTempFileURL 默认 2 小时）时图片会加载失败：用云端本次给的新 URL
+  // 就地换掉这一张。只在真加载失败时才换 URL，所以平时进页面完全不会闪。
+  onPhotoError(e) {
+    const fid = e.currentTarget.dataset.fileid;
+    if (!fid) return;
+    const fresh = (this._serverUrls || {})[fid];
+    const current = (this._urlByFile || {})[fid];
+    if (!fresh || fresh === current) {
+      // 云端新鲜 URL 还没就位（冷启动首次进相片墙的典型竞态）：先把这格登记为
+      // 「需强制换新」，等 applyFamily 拿到云端新鲜 URL 时再换，而不是一直沿用过期旧 URL。
+      this._photoRetry = { ...(this._photoRetry || {}), [fid]: true };
+      return; // 没有新 URL，或换了也一样，重试没意义
+    }
+    this._urlByFile = { ...(this._urlByFile || {}), [fid]: fresh };
+    // 已就地换上新鲜 URL，不再需要强制换
+    if (this._photoRetry) { this._photoRetry[fid] = undefined; delete this._photoRetry[fid]; }
+    const view = buildView(this.data.family, this.data.myOpenid, this._urlByFile, this._photoRetry || {});
+    this._rememberUrls(view);
+    // 同步缓存，避免下次又从过期 URL 起跳
+    this._cacheFamily(this.data.family, view);
+    this.setData({ photoUrls: view.photoUrls, gridPhotos: view.gridPhotos });
   },
 
   async load() {
@@ -169,8 +232,6 @@ Page({
   onMemberTap(e) {
     if (e.currentTarget.dataset.me) this.onEditNick();
   },
-  // 阻挡头像按钮点击冒泡到成员行（避免换头像时误触发生弹昵称编辑）
-  noop() {},
 
   onEditNick() {
     this.setData({ nickInput: this.data.myNick || '', editingNick: true });
@@ -204,39 +265,6 @@ Page({
     }
   },
 
-  // 头像加载失败：回退显示首字母圆标（清掉该成员的 avatar）
-  onAvatarError(e) {
-    const idx = e.currentTarget.dataset.index;
-    const members = this.data.members || [];
-    if (idx == null || !members[idx] || !members[idx].avatar) return;
-    this.setData({ [`members[${idx}].avatar`]: '' });
-  },
-
-  // 点头像换头像：微信头像选择 → 上传云存储 → 保存到家庭 memberAvatars
-  async onChooseAvatar(e) {
-    const tempPath = e.detail && e.detail.avatarUrl;
-    if (!tempPath) return;
-    const openid = this.data.myOpenid || app.globalData.openid || wx.getStorageSync('myOpenid');
-    if (!openid) {
-      wx.showToast({ title: '请先加入家庭', icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '上传中' });
-    try {
-      const ext = (tempPath.split('.').pop() || 'png').toLowerCase();
-      const cloudPath = `avatars/${openid}-${Date.now()}.${ext}`;
-      const up = await wx.cloud.uploadFile({ cloudPath, filePath: tempPath });
-      await updateAvatar(up.fileID);
-      // 刷新拿到最新家庭成员头像
-      await this.load();
-      wx.hideLoading();
-      wx.showToast({ title: '头像已更新', icon: 'success' });
-    } catch (err) {
-      wx.hideLoading();
-      wx.showToast({ title: err.message || '上传失败', icon: 'none' });
-    }
-  },
-
   onLeave() {
     wx.showModal({
       title: '退出家庭',
@@ -254,9 +282,40 @@ Page({
     wx.navigateTo({ url: '/pages/guide/guide' });
   },
 
-  // 建议墙入口：提建议 / 看收录进度
-  goWall() {
+  goReleaseNotes() {
+    wx.navigateTo({ url: '/pages/releaseNotes/releaseNotes' });
+  },
+
+  // 开启微信提醒（订阅消息）授权：
+  // 订阅消息是「一次性」的，且必须用户本人点击才能弹授权框，
+  // 所以家庭另一半必须自己在这里点一下，才能收到另一方建待办的到点提醒。
+  // ⭐ 关键：授权弹窗里要勾选「总是保持以上选择」——勾选后首页每次添加/勾选待办
+  // 会自动静默续一条额度，日常用就不容易断了。
+  async onEnableRemind() {
+    const ok = await requestTodoReminder();
+    if (ok) {
+      wx.setStorageSync('remindAuthorized', 1);
+      // 刷新「是否已选总是允许」，供首页静默续额度使用
+      if (app.checkRemindSetting) app.checkRemindSetting();
+      wx.showModal({
+        title: '已开启 ✅',
+        content: '以后有到点提醒会微信通知你。\n\n小提示：如果刚才的弹窗里勾选了「总是保持以上选择」，之后会默认续上额度，不用反复点。',
+        showCancel: false,
+        confirmText: '知道啦',
+      });
+    } else {
+      wx.showToast({ title: '未开启，到点不会收到微信通知', icon: 'none' });
+    }
+  },
+
+  // 意见反馈入口：私密提交给开发者，不公开、无社交互动
+  goFeedback() {
     wx.navigateTo({ url: '/pages/wall/wall' });
+  },
+
+  // 反馈管理入口（仅开发者本人可见）
+  goAdminFeedback() {
+    wx.navigateTo({ url: '/pages/adminFeedback/adminFeedback' });
   },
 
   // —— 相片墙 ——
