@@ -42,7 +42,7 @@ const removeAnniversary = (id) => call('updateFamily', { action: 'removeAnnivers
 // —— 待办 CRUD（走云函数 todoOps 服务端写，绕开客户端安全规则的脆弱配置）——
 // 读取仍用客户端 watch（安全规则只挡写，读已正常）
 // 返回 { id }：前端拿到 id 后可以本地直接把新条目插进列表，不必再拉一次全量
-async function addTodo(familyId, content, openid, creatorNick, remindAt) {
+async function addTodo(familyId, content, openid, creatorNick, remindAt, isNote) {
   return call('todoOps', {
     action: 'add',
     familyId,
@@ -50,7 +50,13 @@ async function addTodo(familyId, content, openid, creatorNick, remindAt) {
     openid,
     creatorNick: creatorNick || '我',
     remindAt: remindAt || '',
+    isNote: !!isNote, // true=笔记（随笔）；false/undefined=待办
   });
+}
+
+// 待办 ↔ 笔记互转：只改 isNote 标记
+async function convertTodo(id, isNote) {
+  return call('todoOps', { action: 'convert', id, isNote: !!isNote });
 }
 
 async function toggleTodo(id, done) {
@@ -150,6 +156,7 @@ module.exports = {
   editAnniversary,
   removeAnniversary,
   addTodo,
+  convertTodo,
   toggleTodo,
   setImportant,
   clearDoneTodos,

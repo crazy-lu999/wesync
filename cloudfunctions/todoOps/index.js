@@ -11,6 +11,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
+// 内容长度上限：待办 140（与前端 maxlength 一致）；笔记 200（随笔）。
+const MAX_TODO_LEN = 140;
+const MAX_NOTE_LEN = 200;
+
 // 校验待办存在且调用者属于其**当前**家庭成员；返回待办数据 + 家庭数据。
 // 通过 familyId 反查 families 的实时 members，而不是用创建时快照的 doc.members，
 // 避免“家庭新增成员后无法操作旧待办”的回归。
@@ -30,9 +34,12 @@ exports.main = async (event) => {
     if (event.action === 'add') {
       const familyId = String(event.familyId || '');
       const content = String(event.content || '').trim();
-      // 自定义提醒时刻（epoch 毫秒）；0/空 = 不提醒
+      const isNote = !!event.isNote;
+      const MAX = isNote ? MAX_NOTE_LEN : MAX_TODO_LEN;
+      // 自定义提醒时刻（epoch 毫秒）；0/空 = 不提醒（笔记无提醒）
       const remindAt = event.remindAt ? Number(event.remindAt) : null;
       if (!familyId || !content) return { code: 1, message: '参数不完整' };
+      if (content.length > MAX) return { code: 1, message: `内容最多 ${MAX} 字` };
       // 取该家庭成员 openid，写入 todo.members，供 read 规则用 auth.openid in doc.members 判断
       let members = [];
       try {
@@ -47,11 +54,12 @@ exports.main = async (event) => {
         data: {
           familyId,
           content,
+          isNote, // true=笔记（随笔），false/undefined=待办。由前端过滤决定展示位置
           done: false,
           members,
           creatorOpenid: OPENID,
           creatorNick: String(event.creatorNick || '我'),
-          remindAt, // 自定义提醒时刻（epoch 毫秒，null=不提醒），sendReminders 到点发送
+          remindAt, // 自定义提醒时刻（epoch 毫秒，null=不提醒），sendReminders 到点发送；笔记不提醒
           createTime: db.serverDate(),
           doneTime: null,
           reminded: false, // 是否已发提醒（sendReminders 触达后置 true，防重复）
@@ -123,7 +131,10 @@ exports.main = async (event) => {
       const id = String(event.id || '');
       const content = String(event.content || '').trim();
       if (!id || !content) return { code: 1, message: '编辑内容不能为空' };
-      try { await assertMemberTodo(id, OPENID); } catch (e) { return { code: 1, message: e.message }; }
+      let isNote = false;
+      try { isNote = !!(await assertMemberTodo(id, OPENID)).data.isNote; } catch (e) { return { code: 1, message: e.message }; }
+      const MAX = isNote ? MAX_NOTE_LEN : MAX_TODO_LEN;
+      if (content.length > MAX) return { code: 1, message: `内容最多 ${MAX} 字` };
       const data = { content };
       // remindAt 显式更新（0/空 = 清掉提醒）；若提醒时刻变了，重置 reminded 重新武装
       if (event.hasOwnProperty('remindAt')) {
@@ -145,6 +156,17 @@ exports.main = async (event) => {
         }
       }
       await db.collection('todos').doc(id).update({ data });
+      return { code: 0, message: 'ok', data: {} };
+    }
+
+    if (event.action === 'convert') {
+      // 待办 ↔ 笔记 互转：改 isNote 标记即可，数据、成员、实时同步全部沿用。
+      const id = String(event.id || '');
+      if (!id) return { code: 1, message: '参数不完整' };
+      try { await assertMemberTodo(id, OPENID); } catch (e) { return { code: 1, message: e.message }; }
+      await db.collection('todos').doc(id).update({
+        data: { isNote: !!event.isNote },
+      });
       return { code: 0, message: 'ok', data: {} };
     }
 

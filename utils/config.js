@@ -1,9 +1,11 @@
 // utils/config.js — 运行时配置
 module.exports = {
   // 应用版本号：发版时请同步更新这里（会展示在「我的」页底部与「使用说明」页）
-  APP_VERSION: '1.0.16',
+  APP_VERSION: '1.0.17',
   // 意见反馈：单条字数上限（需与 cloudfunctions/submitFeedback/index.js 的 MAX_LEN 一致）
   FEEDBACK_MAX_LEN: 300,
+  // 笔记（随笔）字数上限（需与 cloudfunctions/todoOps/index.js 的 MAX_NOTE_LEN 一致）
+  NOTE_MAX_LEN: 200,
   // 开发者 openid：仅用于「我的」页显示「反馈管理」入口。
   // 真正的权限校验在云函数 adminFeedback 内（服务端按 OPENID 判断），客户端改配置也无法越权。
   ADMIN_OPENID: 'oXz_0xVBfXW5p44Pn4vHs9CVYCVg',
