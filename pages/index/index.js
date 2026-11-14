@@ -728,6 +728,14 @@ Page({
     this._syncTipTimer = setTimeout(() => this.setData({ syncTip: '' }), 2600);
   },
 
+  // 用 _id 定位条目：长按菜单打开的 1~2 秒内，对方改动会经 watch 推送并重排列表，
+  // 这时按下标取数会拿错条目；_id 不受重排影响，从旧事件对象里读也始终指向同一条。
+  findTodo(e) {
+    const id = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id;
+    if (!id) return null;
+    return this.data.todos.find((t) => t._id === id) || null;
+  },
+
   onInput(e) {
     this.setData({ inputVal: e.detail.value });
   },
@@ -834,8 +842,7 @@ Page({
   // 点击圆形勾选：切换完成状态（完成=标记，保留在列表并计入"已完成"，不删除）+ 撒花庆祝
   async onToggle(e) {
     this.maybeRenewRemindQuota();
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
+    const todo = this.findTodo(e);
     if (!todo) return;
     const becomingDone = !todo.done;
     // 深拷贝一层条目：setLocallyDone 是原位改 done 的，直接 slice() 会共享同一批对象，
@@ -929,9 +936,10 @@ Page({
   },
 
   // 长按弹出二级菜单：重要 / 编辑 / 删除
+  // 注意：菜单回调转发的 e 是长按那一刻的旧事件，但 findTodo 只依赖 dataset.id（不会变），
+  // 列表被对方改动重排后仍能定位到当初长按的那一条，不会误操作到别的待办。
   onTodoLongPress(e) {
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
+    const todo = this.findTodo(e);
     if (!todo) return;
     const markLabel = todo.important ? '⭐ 取消重要' : '⭐ 设为重要';
     wx.showActionSheet({
@@ -946,8 +954,7 @@ Page({
 
   // 标记/取消重要
   async onToggleImportant(e) {
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
+    const todo = this.findTodo(e);
     if (!todo) return;
     const imp = !todo.important;
     const prev = this.data.todos.map((t) => ({ ...t }));
@@ -1093,8 +1100,7 @@ Page({
 
   // 行内按钮：编辑（直接进入编辑态，输入框回填已有内容再聚焦）
   onEnterEdit(e) {
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
+    const todo = this.findTodo(e);
     if (!todo) return;
     // 先把 value 写进 input，再 nextTick 聚焦，避免微信 input 的 value 与
     // focus 同帧 setData 时 value 被吞，导致看不到已有内容/像是在“追加”。
@@ -1116,8 +1122,7 @@ Page({
 
   // 删除（5 秒内可撤销）
   onDeleteTodo(e) {
-    const { index } = e.currentTarget.dataset;
-    const todo = this.data.todos[index];
+    const todo = this.findTodo(e);
     if (!todo) return;
     wx.showModal({
       title: '删除待办',
