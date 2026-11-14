@@ -58,7 +58,7 @@
           class="photo-cell"
           wx:for="{{gridPhotos}}"
           wx:key="fileID"
-          data-index="{{item.index}}"
+          data-fileid="{{item.fileID}}"
           bindtap="onPreviewPhoto"
           bindlongpress="onPhotoMenu"
           hover-class="cell-hover"

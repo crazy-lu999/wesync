@@ -472,29 +472,29 @@ Page({
     });
   },
 
-  // 点按预览大图：用临时可访问 URL，保证对方也能打开
+  // 点按预览大图：用临时可访问 URL，保证对方也能打开。
+  // 按 fileID 定位（长按菜单打开期间对方可能删照片导致列表重排，下标会指错）
   onPreviewPhoto(e) {
     const urls = this.data.photoUrls || [];
     if (!urls.length) return;
-    const idx = e.currentTarget.dataset.index;
+    const fid = e.currentTarget.dataset.fileid;
+    const cell = (this.data.gridPhotos || []).find((p) => p.fileID === fid);
     wx.previewImage({
-      current: urls[idx] || urls[0],
+      current: (cell && urls[cell.index]) || urls[0],
       urls,
     });
   },
 
-  // 长按照片：直接删除（已去掉封面功能）
+  // 长按照片：直接删除（已去掉封面功能）。按 fileID 定位，防止列表重排后删错
   onPhotoMenu(e) {
-    const idx = e.currentTarget.dataset.index;
-    const url = this.data.photos[idx];
-    if (!url) return;
-    this.confirmDeletePhoto(idx);
+    const fid = e.currentTarget.dataset.fileid;
+    const cell = (this.data.gridPhotos || []).find((p) => p.fileID === fid);
+    if (!cell) return;
+    this.confirmDeletePhoto(cell.fileID);
   },
 
-  confirmDeletePhoto(idx) {
-    const fileID = this.data.photos[idx];
+  confirmDeletePhoto(fileID) {
     if (!fileID) return;
-    const url = fileID;
     wx.showModal({
       title: '删除这张照片？',
       content: '相片墙和对方那边都会移除。',
@@ -503,7 +503,7 @@ Page({
         if (!res.confirm) return;
         wx.showLoading({ title: '删除中' });
         try {
-          await removeFamilyPhoto(url);
+          await removeFamilyPhoto(fileID);
           const fresh = await getMyFamily();
           app.globalData.family = fresh.family;
           wx.setStorageSync('myFamily', fresh.family);
