@@ -203,11 +203,4 @@ Page({
   goBack() {
     wx.navigateBack();
   },
-
-  onShareAppMessage() {
-    return {
-      title: '我们的记录 💕',
-      path: '/pages/notes/notes',
-    };
-  },
 });

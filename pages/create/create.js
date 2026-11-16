@@ -1,6 +1,5 @@
 // pages/create/create.js
 const { createFamily } = require('../../utils/db.js');
-const { buildShare } = require('../../utils/share.js');
 const app = getApp();
 
 Page({
@@ -8,6 +7,7 @@ Page({
     myNick: '',
     submitting: false,
     result: null, // { inviteCode, familyId }
+    copied: false,
   },
 
   onInput(e) {
@@ -35,22 +35,15 @@ Page({
   copyCode() {
     wx.setClipboardData({
       data: this.data.result.inviteCode,
-      success: () => wx.showToast({ title: '已复制邀请码', icon: 'success' }),
+      success: () => {
+        this.setData({ copied: true });
+        wx.showToast({ title: '已复制邀请码', icon: 'success' });
+      },
     });
   },
 
   backHome() {
     // 重新拉取家庭并回到首页
     wx.reLaunch({ url: '/pages/index/index' });
-  },
-
-  // 转发给朋友：刚建完家庭时带上邀请码 → 对方点开直达加入页并预填邀请码
-  onShareAppMessage() {
-    const code = (this.data.result && this.data.result.inviteCode) || '';
-    return buildShare({ inviteCode: code });
-  },
-
-  onShareTimeline() {
-    return buildShare();
   },
 });

@@ -146,9 +146,9 @@
           <view class="copy-btn">复制</view>
         </view>
       </view>
-      <button class="btn-primary share-invite" open-type="share">🎁 分享给 TA</button>
+      <button class="btn-primary share-invite" bindtap="copyCode">📋 复制邀请码</button>
       <view wx:if="{{members.length < 2}}" class="muted tip">
-        或复制邀请码发给 TA
+        把邀请码给 TA，TA 打开小程序后点「加入家庭」输入即可
       </view>
     </view>
 

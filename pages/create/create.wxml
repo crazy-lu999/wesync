@@ -35,8 +35,9 @@
       <text class="code">{{result.inviteCode}}</text>
       <text class="copy-hint">点击复制</text>
     </view>
-    <view class="muted tip">TA 打开小程序，输入这 6 位码即可</view>
-    <button class="btn-primary share-now" open-type="share">🎁 分享给 TA</button>
+    <view wx:if="{{copied}}" class="copied-tip">✅ 已复制到剪贴板</view>
+    <view class="muted tip">把号码发给 TA；TA 打开小程序后点「加入家庭」，输入这 6 位码即可</view>
+    <button class="btn-primary share-now" bindtap="copyCode">📋 复制邀请码</button>
     <button class="btn-ghost" bindtap="backHome">进入小本本</button>
   </view>
 </view>

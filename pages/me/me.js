@@ -1,6 +1,5 @@
 // pages/me/me.js
 const { getMyFamily, leaveFamily, updateNickname, addFamilyPhotos, removeFamilyPhoto, setWallTitle, addAnniversary, editAnniversary, removeAnniversary, requestTodoReminder } = require('../../utils/db.js');
-const { buildShare } = require('../../utils/share.js');
 const config = require('../../utils/config.js');
 const app = getApp();
 
@@ -536,17 +535,4 @@ Page({
     }
   },
 
-  // 转发给朋友：本页是“我的小家”语境。家庭还有空位时，分享卡片直接带邀请码
-  // 跳加入页并预填（无需对方找码），真正实现“点开即可加入”；家庭已满或无码时
-  // 回落通用品牌卡（引导新用户建新家），避免“满员却还让你来加”的误导。
-  onShareAppMessage() {
-    const family = this.data.family;
-    const hasRoom = (this.data.members || []).length < 2;
-    const code = (family && family.inviteCode && hasRoom) ? family.inviteCode : '';
-    return buildShare({ inviteCode: code });
-  },
-
-  onShareTimeline() {
-    return buildShare();
-  },
 });

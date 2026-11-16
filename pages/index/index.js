@@ -1,7 +1,6 @@
 // pages/index/index.js
 const { getMyFamily, getMyTodos, addTodo, editTodo, toggleTodo, removeTodo, setImportant, clearDoneTodos, convertTodo, subscribeTodos, requestTodoReminder } = require('../../utils/db.js');
 const { fmtTime } = require('../../utils/format.js');
-const { buildShare } = require('../../utils/share.js');
 const { getLocalRelease } = require('../../utils/release-notes.js');
 const config = require('../../utils/config.js');
 const app = getApp();
@@ -196,15 +195,6 @@ Page({
 
   onLoad() {
     this.loadFamily();
-  },
-
-  // 转发给朋友/朋友圈：统一品牌卡，引导新用户建自己的小家
-  onShareAppMessage() {
-    return buildShare();
-  },
-
-  onShareTimeline() {
-    return buildShare();
   },
 
   // 判断是否有新版本。冷启动 & 热启动都会走这里，双保险：
